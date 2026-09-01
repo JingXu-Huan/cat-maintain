@@ -85,7 +85,8 @@ public class MaintenanceService {
         MaintenanceRecord record = requireRecord(id);
         if (!record.getStoreId().equals(storeId)) throw forbidden();
         if (record.getServiceCompletedAt() != null) return MaintenanceResponse.from(record);
-        if (!record.getServiceStartedAt().isBefore(LocalDateTime.now())) {
+        // MySQL DATETIME 按秒保存，允许完成操作与开始操作落在同一秒；只拒绝明显来自未来的脏数据。
+        if (record.getServiceStartedAt().isAfter(LocalDateTime.now().plusSeconds(1))) {
             throw new BusinessException(HttpStatus.CONFLICT, "INVALID_SERVICE_TIME", "服务完成时间必须晚于开始时间");
         }
         if (maintenanceRecordMapper.complete(id, request.mileage(), request.content().trim(), normalize(request.remark())) == 0) {
