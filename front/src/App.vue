@@ -2,8 +2,10 @@
 import { onMounted, ref } from 'vue'
 import { getCurrentAccount } from './api/auth'
 import { getJson } from './api/http'
+import AdminProductPanel from './components/AdminProductPanel.vue'
 import AdminStorePanel from './components/AdminStorePanel.vue'
 import AuthPanel from './components/AuthPanel.vue'
+import ProductCatalogPanel from './components/ProductCatalogPanel.vue'
 import type { AccountResponse } from './types/auth'
 import type { HealthResponse } from './types/health'
 
@@ -145,7 +147,10 @@ onMounted(async () => {
         @logged-out="currentAccount = null"
       />
 
+      <ProductCatalogPanel />
+
       <AdminStorePanel v-if="currentAccount?.role === 'ADMIN'" />
+      <AdminProductPanel v-if="currentAccount?.role === 'ADMIN'" />
 
       <section class="stack-section">
         <div class="stack-heading">
