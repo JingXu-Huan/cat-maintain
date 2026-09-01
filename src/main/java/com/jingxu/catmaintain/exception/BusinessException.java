@@ -1,7 +1,9 @@
 package com.jingxu.catmaintain.exception;
 
+import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
+@Getter
 public class BusinessException extends RuntimeException {
 
     private final HttpStatus status;
@@ -13,11 +15,4 @@ public class BusinessException extends RuntimeException {
         this.code = code;
     }
 
-    public HttpStatus getStatus() {
-        return status;
-    }
-
-    public String getCode() {
-        return code;
-    }
 }

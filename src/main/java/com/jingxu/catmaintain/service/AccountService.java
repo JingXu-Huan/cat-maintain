@@ -10,27 +10,19 @@ import com.jingxu.catmaintain.dto.auth.UserRegisterRequest;
 import com.jingxu.catmaintain.exception.BusinessException;
 import com.jingxu.catmaintain.mapper.AccountMapper;
 import com.jingxu.catmaintain.mapper.MerchantStoreMapper;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class AccountService {
 
     private final AccountMapper accountMapper;
     private final MerchantStoreMapper merchantStoreMapper;
     private final PasswordEncoder passwordEncoder;
-
-    public AccountService(
-            AccountMapper accountMapper,
-            MerchantStoreMapper merchantStoreMapper,
-            PasswordEncoder passwordEncoder
-    ) {
-        this.accountMapper = accountMapper;
-        this.merchantStoreMapper = merchantStoreMapper;
-        this.passwordEncoder = passwordEncoder;
-    }
 
     @Transactional
     public Account registerUser(UserRegisterRequest request) {

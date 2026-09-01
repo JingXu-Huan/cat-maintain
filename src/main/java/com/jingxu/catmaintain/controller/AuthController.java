@@ -11,6 +11,7 @@ import com.jingxu.catmaintain.exception.BusinessException;
 import com.jingxu.catmaintain.service.AccountService;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,15 +22,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/auth")
+@RequiredArgsConstructor
 public class AuthController {
 
     private static final String ACCOUNT_ID = "accountId";
 
     private final AccountService accountService;
-
-    public AuthController(AccountService accountService) {
-        this.accountService = accountService;
-    }
 
     @PostMapping("/register/user")
     @ResponseStatus(HttpStatus.CREATED)
