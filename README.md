@@ -67,7 +67,7 @@ npm run build
 
 ## 当前已实现：账户模块
 
-数据库初始化脚本位于 `db/init/001_account.sql` 和 `db/init/002_business.sql`，当前基础模型包含 8 张表：
+数据库初始化脚本位于 `db/init/001_account.sql`、`db/init/002_business.sql` 和 `db/init/003_workflow.sql`，当前基础模型包含 8 张表，并为加盟店审核和订单流程补充了状态时间字段：
 
 | 表 | 用途 |
 | --- | --- |
@@ -92,4 +92,16 @@ Docker 数据卷已经存在时，修改初始化脚本不会自动重新执行�
 | POST | `/api/auth/logout` | 注销当前 Session |
 | GET | `/api/auth/me` | 获取当前登录账号 |
 
-目前已实现账户注册、登录和 Session 接口。加盟店审核、商品/库存、订单审批与配送、数字凭据核销、预约、保养记录和评价接口仍将在后续模块中实现；对应数据库表已先按业务关系建立。
+目前已实现账户注册、登录、Session 接口和加盟店审核接口。商品/库存、订单审批与配送、数字凭据核销、预约、保养记录和评价接口仍将在后续模块中实现；对应数据库表已先按业务关系建立。
+
+## 加盟店审核（M1）
+
+平台管理员登录后可调用：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/admin/stores?status=PENDING` | 查看待审核加盟店 |
+| PUT | `/api/admin/stores/{storeId}/approve` | 审核通过 |
+| PUT | `/api/admin/stores/{storeId}/reject` | 审核拒绝，可提交 `reason` |
+
+`003_workflow.sql` 会为本地测试写入管理员账号 `admin`，密码为 `Admin123!`。该账号仅用于本机开发验证，部署到真实环境前必须替换或删除。

@@ -1,4 +1,4 @@
-import { postJson } from './http'
+import { getJson, postJson } from './http'
 import type { AccountResponse, LoginResponse, StoreRegisterResponse } from '../types/auth'
 
 export function registerUser(payload: { username: string; password: string; phone: string }) {
@@ -18,4 +18,12 @@ export function registerStore(payload: {
 
 export function login(payload: { username: string; password: string }) {
   return postJson<LoginResponse>('/api/auth/login', payload)
+}
+
+export function getCurrentAccount() {
+  return getJson<AccountResponse>('/api/auth/me')
+}
+
+export function logout() {
+  return postJson<void>('/api/auth/logout', undefined)
 }

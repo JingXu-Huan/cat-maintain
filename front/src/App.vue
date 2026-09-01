@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { getCurrentAccount } from './api/auth'
 import { getJson } from './api/http'
+import AdminStorePanel from './components/AdminStorePanel.vue'
 import AuthPanel from './components/AuthPanel.vue'
+import type { AccountResponse } from './types/auth'
 import type { HealthResponse } from './types/health'
 
 type ApiStatus = 'checking' | 'up' | 'offline'
@@ -15,6 +18,7 @@ interface PlatformModule {
 
 const apiStatus = ref<ApiStatus>('checking')
 const apiMessage = ref('正在检查后端接口')
+const currentAccount = ref<AccountResponse | null>(null)
 
 const platformModules: PlatformModule[] = [
   {
@@ -51,7 +55,18 @@ async function checkApi() {
   }
 }
 
-onMounted(checkApi)
+async function loadCurrentAccount() {
+  try {
+    currentAccount.value = await getCurrentAccount()
+  } catch {
+    currentAccount.value = null
+  }
+}
+
+onMounted(async () => {
+  await checkApi()
+  await loadCurrentAccount()
+})
 </script>
 
 <template>
@@ -124,7 +139,13 @@ onMounted(checkApi)
         </div>
       </section>
 
-      <AuthPanel />
+      <AuthPanel
+        :account="currentAccount"
+        @logged-in="currentAccount = $event"
+        @logged-out="currentAccount = null"
+      />
+
+      <AdminStorePanel v-if="currentAccount?.role === 'ADMIN'" />
 
       <section class="stack-section">
         <div class="stack-heading">

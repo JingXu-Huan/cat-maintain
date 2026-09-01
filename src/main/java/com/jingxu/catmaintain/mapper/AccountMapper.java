@@ -1,11 +1,13 @@
 package com.jingxu.catmaintain.mapper;
 
 import com.jingxu.catmaintain.domain.account.Account;
+import com.jingxu.catmaintain.domain.account.AccountStatus;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 @Mapper
 public interface AccountMapper {
@@ -30,4 +32,15 @@ public interface AccountMapper {
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id", keyColumn = "id")
     int insert(Account account);
+
+    @Update("""
+            UPDATE accounts
+            SET status = #{targetStatus}
+            WHERE id = #{id} AND status = #{expectedStatus}
+            """)
+    int updateStatusIfCurrent(
+            @Param("id") Long id,
+            @Param("expectedStatus") AccountStatus expectedStatus,
+            @Param("targetStatus") AccountStatus targetStatus
+    );
 }

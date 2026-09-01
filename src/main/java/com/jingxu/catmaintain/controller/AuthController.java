@@ -7,8 +7,8 @@ import com.jingxu.catmaintain.dto.auth.LoginResponse;
 import com.jingxu.catmaintain.dto.auth.StoreRegisterRequest;
 import com.jingxu.catmaintain.dto.auth.StoreRegisterResponse;
 import com.jingxu.catmaintain.dto.auth.UserRegisterRequest;
-import com.jingxu.catmaintain.exception.BusinessException;
 import com.jingxu.catmaintain.service.AccountService;
+import com.jingxu.catmaintain.service.SessionAccountService;
 import jakarta.servlet.http.HttpSession;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -26,9 +26,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AuthController {
 
-    private static final String ACCOUNT_ID = "accountId";
-
     private final AccountService accountService;
+    private final SessionAccountService sessionAccountService;
 
     @PostMapping("/register/user")
     @ResponseStatus(HttpStatus.CREATED)
@@ -56,7 +55,7 @@ public class AuthController {
     ) {
         Account account = accountService.authenticate(request);
         servletRequest.changeSessionId();
-        session.setAttribute(ACCOUNT_ID, account.getId());
+        session.setAttribute(SessionAccountService.ACCOUNT_ID_ATTRIBUTE, account.getId());
         return new LoginResponse(AccountResponse.from(account), "登录成功");
     }
 
@@ -68,14 +67,6 @@ public class AuthController {
 
     @GetMapping("/me")
     public AccountResponse currentAccount(HttpSession session) {
-        Long accountId = (Long) session.getAttribute(ACCOUNT_ID);
-        if (accountId == null) {
-            throw new BusinessException(
-                    HttpStatus.UNAUTHORIZED,
-                    "NOT_LOGGED_IN",
-                    "请先登录"
-            );
-        }
-        return AccountResponse.from(accountService.findById(accountId));
+        return AccountResponse.from(sessionAccountService.require(session));
     }
 }
