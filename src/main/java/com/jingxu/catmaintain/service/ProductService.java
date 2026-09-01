@@ -94,6 +94,13 @@ public class ProductService {
         return productMapper.findSaleableByIds(ids);
     }
 
+    @Transactional
+    public void decreaseStockForOrder(Long id, int quantity) {
+        if (quantity < 1 || productMapper.adjustStock(id, -quantity) == 0) {
+            throw new BusinessException(HttpStatus.CONFLICT, "INSUFFICIENT_STOCK", "库存不足，订单未创建");
+        }
+    }
+
     private ProductPageResponse page(ProductStatus status, int page, int size) {
         validatePage(page, size);
         List<ProductResponse> content = productMapper.findPage(status, page * size, size)

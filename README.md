@@ -65,9 +65,9 @@ npm run dev
 npm run build
 ```
 
-## 当前已实现：账户模块
+## 当前已实现：账户、商品、订单、预约与保养模块
 
-数据库初始化脚本位于 `db/init/001_account.sql`、`db/init/002_business.sql` 和 `db/init/003_workflow.sql`，当前基础模型包含 8 张表，并为加盟店审核和订单流程补充了状态时间字段：
+数据库初始化脚本位于 `db/init/001_account.sql`、`db/init/002_business.sql`、`db/init/003_workflow.sql` 和 `db/init/004_integrity.sql`，当前模型包含 8 张业务表，并为审核、订单流程和保养记录补充了状态/时间/唯一性约束：
 
 | 表 | 用途 |
 | --- | --- |
@@ -92,7 +92,7 @@ Docker 数据卷已经存在时，修改初始化脚本不会自动重新执行�
 | POST | `/api/auth/logout` | 注销当前 Session |
 | GET | `/api/auth/me` | 获取当前登录账号 |
 
-目前已实现账户注册、登录、Session 接口和加盟店审核接口。商品/库存、订单审批与配送、数字凭据核销、预约、保养记录和评价接口仍将在后续模块中实现；对应数据库表已先按业务关系建立。
+目前已实现账户注册/登录、加盟店审核、商品与库存、订单审批/配送/核销、预约、保养记录和评价。后端所有接口都通过 Service 层校验角色和数据归属，前端只通过 `/api` 访问后端。
 
 ## 加盟店审核（M1）
 
@@ -105,3 +105,18 @@ Docker 数据卷已经存在时，修改初始化脚本不会自动重新执行�
 | PUT | `/api/admin/stores/{storeId}/reject` | 审核拒绝，可提交 `reason` |
 
 `003_workflow.sql` 会为本地测试写入管理员账号 `admin`，密码为 `Admin123!`。该账号仅用于本机开发验证，部署到真实环境前必须替换或删除。
+
+## 已实现业务接口
+
+| 模块 | 主要接口 |
+| --- | --- |
+| 商品与门店 | `GET /api/products`、`GET /api/stores`；管理员使用 `/api/admin/products` 新增、修改、上下架和调整库存 |
+| 用户订单 | `POST/GET /api/orders`、`GET /api/orders/{id}` |
+| 平台订单 | `/api/admin/orders` 审批、拒绝和配送，配送时生成 8 位数字核销码 |
+| 门店订单 | `/api/store/orders` 查询门店订单，`GET /lookup` 查询核销码，`PUT /{id}/verify` 核销 |
+| 用户预约 | `POST/GET /api/appointments`、`PUT /api/appointments/{id}/cancel` |
+| 门店预约 | `/api/store/appointments` 查询、确认和拒绝 |
+| 保养记录 | 用户 `GET /api/maintenance-records`；门店在 `/api/store/maintenance-records` 开始/完成服务 |
+| 评价 | 用户 `POST/GET /api/reviews`；公开门店评价 `GET /api/stores/{storeId}/reviews` |
+
+订单创建与库存扣减在同一事务中完成，扣库存使用带非负条件的原子更新；订单列表采用一次批量明细查询，不在订单循环中逐条查询明细。维修记录通过 `004_integrity.sql` 保证一个预约最多一条记录。

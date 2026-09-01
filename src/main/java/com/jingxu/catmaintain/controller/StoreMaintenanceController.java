@@ -23,8 +23,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class StoreMaintenanceController {
 
     private final MaintenanceService maintenanceService;
-    private final SessionAccountService sessionAccountService;
-    private final MerchantStoreMapper merchantStoreMapper;
 
     @GetMapping
     public MaintenancePageResponse list(
