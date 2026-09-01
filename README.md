@@ -8,6 +8,10 @@
 - 前端：`front`，Vue 3 + TypeScript + Vite，开发服务器端口为 `5173`。
 - 数据库：`compose.yaml`，Docker MySQL 8.4，宿主机端口为 `3307`。
 
+## 前后端边界
+
+前端禁止直接连接 MySQL 或其他数据库。`front` 只通过 `/api` 调用 Spring Boot 接口，Vite 开发代理将请求转发到 `http://localhost:8080`；数据库驱动、连接地址、账号密码、事务和持久化逻辑只能存在于后端。前端环境变量也不得存放数据库凭据。
+
 ## 启动 MySQL
 
 在项目根目录执行：

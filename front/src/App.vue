@@ -133,7 +133,7 @@ onMounted(checkApi)
         </div>
         <div class="stack-list">
           <div><strong>01</strong><span>Spring Boot 4</span><small>Java 21 · REST API</small></div>
-          <div><strong>02</strong><span>MyBatis</span><small>MySQL · 数据持久化</small></div>
+          <div><strong>02</strong><span>后端数据层</span><small>MyBatis · MySQL</small></div>
           <div><strong>03</strong><span>Vue 3</span><small>TypeScript · Vite</small></div>
         </div>
       </section>
