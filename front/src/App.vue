@@ -3,9 +3,12 @@ import { onMounted, ref } from 'vue'
 import { getCurrentAccount } from './api/auth'
 import { getJson } from './api/http'
 import AdminProductPanel from './components/AdminProductPanel.vue'
+import AdminOrderPanel from './components/AdminOrderPanel.vue'
 import AdminStorePanel from './components/AdminStorePanel.vue'
 import AuthPanel from './components/AuthPanel.vue'
+import OrderPanel from './components/OrderPanel.vue'
 import ProductCatalogPanel from './components/ProductCatalogPanel.vue'
+import StoreOrderPanel from './components/StoreOrderPanel.vue'
 import type { AccountResponse } from './types/auth'
 import type { HealthResponse } from './types/health'
 
@@ -149,8 +152,12 @@ onMounted(async () => {
 
       <ProductCatalogPanel />
 
+      <OrderPanel v-if="currentAccount?.role === 'USER'" />
+
       <AdminStorePanel v-if="currentAccount?.role === 'ADMIN'" />
       <AdminProductPanel v-if="currentAccount?.role === 'ADMIN'" />
+      <AdminOrderPanel v-if="currentAccount?.role === 'ADMIN'" />
+      <StoreOrderPanel v-if="currentAccount?.role === 'STORE'" />
 
       <section class="stack-section">
         <div class="stack-heading">

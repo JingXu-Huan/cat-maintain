@@ -54,4 +54,21 @@ public interface MerchantStoreMapper {
             WHERE account_id = #{accountId}
             """)
     MerchantStore findByAccountId(@Param("accountId") Long accountId);
+
+    @Select("""
+            SELECT s.id, s.account_id, s.store_name, s.contact_name, s.phone, s.address
+            FROM merchant_stores s
+            JOIN accounts a ON a.id = s.account_id
+            WHERE s.id = #{storeId} AND a.role = 'STORE' AND a.status = 'ACTIVE'
+            """)
+    MerchantStore findActiveById(@Param("storeId") Long storeId);
+
+    @Select("""
+            SELECT s.id, s.account_id, s.store_name, s.contact_name, s.phone, s.address
+            FROM merchant_stores s
+            JOIN accounts a ON a.id = s.account_id
+            WHERE a.role = 'STORE' AND a.status = 'ACTIVE'
+            ORDER BY s.store_name, s.id
+            """)
+    List<MerchantStore> findActiveStores();
 }

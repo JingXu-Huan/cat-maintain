@@ -10,3 +10,11 @@ export interface StoreApplication {
   reviewRemark: string | null
   reviewedAt: string | null
 }
+
+export interface StoreSummary {
+  id: number
+  storeName: string
+  contactName: string
+  phone: string
+  address: string
+}
