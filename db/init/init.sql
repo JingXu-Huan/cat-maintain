@@ -1,3 +1,34 @@
+-- cat-maintain 数据库初始化脚本
+-- 执行顺序：基础账号/门店 -> 业务表 -> 工作流字段与管理员 -> 完整性约束
+
+CREATE TABLE IF NOT EXISTS accounts (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    username VARCHAR(50) NOT NULL,
+    password_hash VARCHAR(100) NOT NULL,
+    phone VARCHAR(30) NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_accounts_username (username)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS merchant_stores (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    account_id BIGINT UNSIGNED NOT NULL,
+    store_name VARCHAR(100) NOT NULL,
+    contact_name VARCHAR(50) NOT NULL,
+    phone VARCHAR(30) NOT NULL,
+    address VARCHAR(255) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_merchant_stores_account_id (account_id),
+    CONSTRAINT fk_merchant_stores_account_id
+        FOREIGN KEY (account_id) REFERENCES accounts (id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS products (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     sku VARCHAR(50) NOT NULL,
@@ -124,3 +155,84 @@ CREATE TABLE IF NOT EXISTS reviews (
     CONSTRAINT fk_reviews_order_id
         FOREIGN KEY (order_id) REFERENCES orders (id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- MySQL 8.4 不支持 ADD COLUMN IF NOT EXISTS，使用 information_schema 做幂等迁移。
+SET @sql = IF(
+    (SELECT COUNT(*) FROM information_schema.columns
+     WHERE table_schema = DATABASE() AND table_name = 'merchant_stores' AND column_name = 'review_remark') = 0,
+    'ALTER TABLE merchant_stores ADD COLUMN review_remark VARCHAR(255) NULL AFTER address',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+    (SELECT COUNT(*) FROM information_schema.columns
+     WHERE table_schema = DATABASE() AND table_name = 'merchant_stores' AND column_name = 'reviewed_at') = 0,
+    'ALTER TABLE merchant_stores ADD COLUMN reviewed_at DATETIME NULL AFTER review_remark',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+    (SELECT COUNT(*) FROM information_schema.columns
+     WHERE table_schema = DATABASE() AND table_name = 'orders' AND column_name = 'rejected_reason') = 0,
+    'ALTER TABLE orders ADD COLUMN rejected_reason VARCHAR(255) NULL AFTER verification_code',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+    (SELECT COUNT(*) FROM information_schema.columns
+     WHERE table_schema = DATABASE() AND table_name = 'orders' AND column_name = 'verified_at') = 0,
+    'ALTER TABLE orders ADD COLUMN verified_at DATETIME NULL AFTER delivered_at',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+    (SELECT COUNT(*) FROM information_schema.columns
+     WHERE table_schema = DATABASE() AND table_name = 'orders' AND column_name = 'verified_by_store_id') = 0,
+    'ALTER TABLE orders ADD COLUMN verified_by_store_id BIGINT UNSIGNED NULL AFTER verified_at',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+    (SELECT COUNT(*) FROM information_schema.columns
+     WHERE table_schema = DATABASE() AND table_name = 'orders' AND column_name = 'completed_at') = 0,
+    'ALTER TABLE orders ADD COLUMN completed_at DATETIME NULL AFTER verified_by_store_id',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+INSERT IGNORE INTO accounts (username, password_hash, phone, role, status)
+VALUES (
+    'admin',
+    '$2a$10$tNxozLajZ1BFLANvBdV4d.tv0ebhpDWP.NbCV9ci/tgGk2xOA2MES',
+    '10000000000',
+    'ADMIN',
+    'ACTIVE'
+);
+
+SET @sql = IF(
+    (SELECT COUNT(*) FROM information_schema.statistics
+     WHERE table_schema = DATABASE() AND table_name = 'maintenance_records'
+       AND index_name = 'uk_maintenance_records_appointment') = 0,
+    'ALTER TABLE maintenance_records ADD UNIQUE KEY uk_maintenance_records_appointment (appointment_id)',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

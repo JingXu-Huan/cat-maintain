@@ -67,7 +67,7 @@ npm run build
 
 ## 当前已实现：账户、商品、订单、预约与保养模块
 
-数据库初始化脚本位于 `db/init/001_account.sql`、`db/init/002_business.sql`、`db/init/003_workflow.sql` 和 `db/init/004_integrity.sql`，当前模型包含 8 张业务表，并为审核、订单流程和保养记录补充了状态/时间/唯一性约束：
+数据库初始化脚本统一位于 `db/init/init.sql`，按账号/门店、业务表、工作流字段、管理员种子、完整性约束的顺序执行；当前模型包含 8 张业务表，并为审核、订单流程和保养记录补充了状态/时间/唯一性约束：
 
 | 表 | 用途 |
 | --- | --- |
@@ -104,7 +104,7 @@ Docker 数据卷已经存在时，修改初始化脚本不会自动重新执行�
 | PUT | `/api/admin/stores/{storeId}/approve` | 审核通过 |
 | PUT | `/api/admin/stores/{storeId}/reject` | 审核拒绝，可提交 `reason` |
 
-`003_workflow.sql` 会为本地测试写入管理员账号 `admin`，密码为 `Admin123!`。该账号仅用于本机开发验证，部署到真实环境前必须替换或删除。
+`init.sql` 会为本地测试写入管理员账号 `admin`，密码为 `Admin123!`。该账号仅用于本机开发验证，部署到真实环境前必须替换或删除。
 
 ## 已实现业务接口
 
@@ -119,4 +119,4 @@ Docker 数据卷已经存在时，修改初始化脚本不会自动重新执行�
 | 保养记录 | 用户 `GET /api/maintenance-records`；门店在 `/api/store/maintenance-records` 开始/完成服务 |
 | 评价 | 用户 `POST/GET /api/reviews`；公开门店评价 `GET /api/stores/{storeId}/reviews` |
 
-订单创建与库存扣减在同一事务中完成，扣库存使用带非负条件的原子更新；订单列表采用一次批量明细查询，不在订单循环中逐条查询明细。维修记录通过 `004_integrity.sql` 保证一个预约最多一条记录。
+订单创建与库存扣减在同一事务中完成，扣库存使用带非负条件的原子更新；订单列表采用一次批量明细查询，不在订单循环中逐条查询明细。维修记录通过 `init.sql` 的唯一索引保证一个预约最多一条记录。
