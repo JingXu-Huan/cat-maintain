@@ -33,22 +33,21 @@ docker compose ps
 
 ## 启动后端
 
-默认 `dev` 配置只启动 Web 层和健康接口，不依赖数据库；连接 Docker MySQL 时使用 `local` profile：
+项目只保留一份默认配置：`src/main/resources/application.yaml`。Spring Boot 会自动加载该文件，默认连接本机 Docker MySQL：
 
 ```powershell
-$env:SPRING_PROFILES_ACTIVE = 'local'
 .\mvnw.cmd spring-boot:run
 ```
 
 健康接口：`http://localhost:8080/api/health`
 
-后端测试使用真实 MySQL（不是 H2），执行前请保证 Docker 容器健康：
+后端测试与本地运行使用同一份默认配置和真实 MySQL（不是 H2），执行前请保证 Docker 容器健康：
 
 ```powershell
 .\mvnw.cmd test
 ```
 
-测试 profile 位于 `src/test/resources/application-test.yaml`，默认连接本机 `3307` 的 `cat_maintain` 数据库，并执行 `SELECT 1` 验证连接。
+测试会连接本机 `3307` 的 `cat_maintain` 数据库，并执行 `SELECT 1` 和表结构检查验证连接与基础模型。
 
 ## 启动前端
 

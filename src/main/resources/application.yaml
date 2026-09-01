@@ -3,8 +3,14 @@ spring:
     name: cat-maintain
   config:
     import: optional:file:.env[.properties]
-  profiles:
-    default: dev
+  datasource:
+    url: '${DB_URL:jdbc:mysql://localhost:3307/cat_maintain?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai}'
+    username: ${DB_USERNAME:catmaintain}
+    password: ${DB_PASSWORD:catmaintain}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: never
 
 server:
   port: ${SERVER_PORT:8080}
