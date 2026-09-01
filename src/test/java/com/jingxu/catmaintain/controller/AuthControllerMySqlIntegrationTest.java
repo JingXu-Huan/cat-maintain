@@ -14,6 +14,7 @@ import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -99,6 +100,48 @@ class AuthControllerMySqlIntegrationTest {
                                 """.formatted(username)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCOUNT_NOT_ACTIVE"));
+    }
+
+    @Test
+    void malformedJsonReturnsStructuredError() throws Exception {
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{invalid-json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MALFORMED_JSON"))
+                .andExpect(jsonPath("$.message").value("请求体不是合法的 JSON"));
+    }
+
+    @Test
+    void validationFailureReturnsFieldDetails() throws Exception {
+        mockMvc.perform(post("/api/auth/register/user")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "",
+                                  "password": "short",
+                                  "phone": ""
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.details.username").exists())
+                .andExpect(jsonPath("$.details.password").exists())
+                .andExpect(jsonPath("$.details.phone").exists());
+    }
+
+    @Test
+    void unsupportedMethodReturnsStructuredError() throws Exception {
+        mockMvc.perform(put("/api/auth/login"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"));
+    }
+
+    @Test
+    void missingResourceReturnsStructuredError() throws Exception {
+        mockMvc.perform(get("/api/auth/not-found"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     private String uniqueUsername(String prefix) {
