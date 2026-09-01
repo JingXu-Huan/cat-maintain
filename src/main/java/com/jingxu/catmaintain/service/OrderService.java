@@ -29,7 +29,6 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -203,6 +202,18 @@ public class OrderService {
             throw invalidState();
         }
         return response(requireOrder(id));
+    }
+
+    @Transactional
+    public void completeForMaintenance(Long orderId) {
+        Order order = requireOrder(orderId);
+        if (order.getStatus() == OrderStatus.COMPLETED) {
+            return;
+        }
+        ensureStatus(order, OrderStatus.VERIFIED);
+        if (orderMapper.complete(orderId) == 0) {
+            throw invalidState();
+        }
     }
 
     public Order requireOrder(Long id) {

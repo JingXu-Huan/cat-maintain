@@ -9,6 +9,8 @@ import AuthPanel from './components/AuthPanel.vue'
 import OrderPanel from './components/OrderPanel.vue'
 import ProductCatalogPanel from './components/ProductCatalogPanel.vue'
 import StoreOrderPanel from './components/StoreOrderPanel.vue'
+import StoreServicePanel from './components/StoreServicePanel.vue'
+import UserServicePanel from './components/UserServicePanel.vue'
 import type { AccountResponse } from './types/auth'
 import type { HealthResponse } from './types/health'
 
@@ -153,11 +155,13 @@ onMounted(async () => {
       <ProductCatalogPanel />
 
       <OrderPanel v-if="currentAccount?.role === 'USER'" />
+      <UserServicePanel v-if="currentAccount?.role === 'USER'" />
 
       <AdminStorePanel v-if="currentAccount?.role === 'ADMIN'" />
       <AdminProductPanel v-if="currentAccount?.role === 'ADMIN'" />
       <AdminOrderPanel v-if="currentAccount?.role === 'ADMIN'" />
       <StoreOrderPanel v-if="currentAccount?.role === 'STORE'" />
+      <StoreServicePanel v-if="currentAccount?.role === 'STORE'" />
 
       <section class="stack-section">
         <div class="stack-heading">
