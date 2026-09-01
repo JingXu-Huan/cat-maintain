@@ -10,6 +10,7 @@ import com.jingxu.catmaintain.dto.auth.UserRegisterRequest;
 import com.jingxu.catmaintain.exception.BusinessException;
 import com.jingxu.catmaintain.service.AccountService;
 import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -50,9 +51,11 @@ public class AuthController {
     @PostMapping("/login")
     public LoginResponse login(
             @Valid @RequestBody LoginRequest request,
+            HttpServletRequest servletRequest,
             HttpSession session
     ) {
         Account account = accountService.authenticate(request);
+        servletRequest.changeSessionId();
         session.setAttribute(ACCOUNT_ID, account.getId());
         return new LoginResponse(AccountResponse.from(account), "登录成功");
     }
