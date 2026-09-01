@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { getJson } from './api/http'
+import AuthPanel from './components/AuthPanel.vue'
 import type { HealthResponse } from './types/health'
 
 type ApiStatus = 'checking' | 'up' | 'offline'
@@ -122,6 +123,8 @@ onMounted(checkApi)
           </article>
         </div>
       </section>
+
+      <AuthPanel />
 
       <section class="stack-section">
         <div class="stack-heading">

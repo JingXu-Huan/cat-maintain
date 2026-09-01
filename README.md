@@ -54,10 +54,26 @@ npm install
 npm run dev
 ```
 
-前端通过 Vite 将 `/api` 请求代理到 `http://localhost:8080`。打开 `http://localhost:5173` 可看到初始化页并检查后端连接。
+前端通过 Vite 将 `/api` 请求代理到 `http://localhost:8080`。打开 `http://localhost:5173` 可以检查后端连接，并直接体验账户注册、登录和注销。
 
 生产构建：
 
 ```powershell
 npm run build
 ```
+
+## 当前已实现：账户模块
+
+数据库初始化脚本位于 `db/init/001_account.sql`，创建 `accounts` 和 `merchant_stores` 两张表。Docker 数据卷已经存在时，修改初始化脚本不会自动重新执行；需要手动把脚本导入当前数据库，或在确认数据可删除后重建数据卷。
+
+接口如下：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/api/auth/register/user` | 用户注册，账号直接为 `ACTIVE` |
+| POST | `/api/auth/register/store` | 加盟店注册，账号为 `PENDING`，等待平台审核 |
+| POST | `/api/auth/login` | 登录并创建 HTTP Session |
+| POST | `/api/auth/logout` | 注销当前 Session |
+| GET | `/api/auth/me` | 获取当前登录账号 |
+
+加盟店审核模块尚未实现，因此加盟店注册成功后暂时不能登录；这是当前业务约束，不是前端占位状态。商品、库存、订单、配送凭据、预约、核销和保养记录将在后续模块中继续实现。
