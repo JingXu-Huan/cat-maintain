@@ -110,7 +110,7 @@ Docker 数据卷已经存在时，修改初始化脚本不会自动重新执行�
 
 | 模块 | 主要接口 |
 | --- | --- |
-| 商品与门店 | `GET /api/products`、`GET /api/stores`；管理员使用 `/api/admin/products` 新增、修改、上下架和调整库存 |
+| 商品与门店 | `GET /api/products`、`GET /api/stores`；管理员使用 `/api/admin/products` 新增、修改、删除、上下架和调整库存 |
 | 用户订单 | `POST/GET /api/orders`、`GET /api/orders/{id}` |
 | 平台订单 | `/api/admin/orders` 审批、拒绝和配送，配送时生成 8 位数字核销码 |
 | 门店订单 | `/api/store/orders` 查询门店订单，`GET /lookup` 查询核销码，`PUT /{id}/verify` 核销 |

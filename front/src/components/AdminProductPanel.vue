@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { adjustProductStock, createProduct, listAdminProducts, updateProductStatus } from '../api/products'
+import { adjustProductStock, createProduct, deleteProduct, listAdminProducts, updateProductStatus } from '../api/products'
 import type { Product, ProductStatus } from '../types/product'
 
 const products = ref<Product[]>([])
@@ -45,7 +45,11 @@ async function changeStock(product: Product, delta: number) {
   await act(product.id, () => adjustProductStock(product.id, delta), '库存已更新。')
 }
 
-async function act(id: number, action: () => Promise<Product>, success: string) {
+async function removeProduct(product: Product) {
+  await act(product.id, () => deleteProduct(product.id), '商品已删除。')
+}
+
+async function act(id: number, action: () => Promise<unknown>, success: string) {
   actingId.value = id
   feedback.value = ''
   try {
@@ -93,6 +97,7 @@ onMounted(refresh)
           <button class="secondary-button compact-button" type="button" :disabled="actingId !== null" @click="changeStock(product, 1)">+1</button>
           <button class="secondary-button compact-button" type="button" :disabled="actingId !== null || product.stock === 0" @click="changeStock(product, -1)">-1</button>
           <button class="approve-button" type="button" :disabled="actingId !== null" @click="changeStatus(product)">{{ product.status === 'ACTIVE' ? '下架' : '上架' }}</button>
+          <button class="reject-button" type="button" :disabled="actingId !== null" @click="removeProduct(product)">删除</button>
         </div>
       </article>
     </div>

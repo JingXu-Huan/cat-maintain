@@ -1,4 +1,4 @@
-import { getJson, postJson, putJson } from './http'
+import { deleteJson, getJson, postJson, putJson } from './http'
 import type { Product, ProductPage, ProductStatus } from '../types/product'
 
 export function listProducts(page = 0, size = 20) {
@@ -29,4 +29,8 @@ export function updateProductStatus(id: number, status: ProductStatus) {
 
 export function adjustProductStock(id: number, delta: number) {
   return postJson<Product>(`/api/admin/products/${id}/stock`, { delta })
+}
+
+export function deleteProduct(id: number) {
+  return deleteJson<void>(`/api/admin/products/${id}`)
 }
