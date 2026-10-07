@@ -14,6 +14,7 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -91,6 +92,37 @@ class ProductControllerMySqlIntegrationTest {
         mockMvc.perform(get("/api/admin/products").session(userSession))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    @Transactional
+    void adminCanDeleteProductAndUserCannotDelete() throws Exception {
+        MockHttpSession adminSession = login("admin", "Admin123!");
+        MvcResult createResult = mockMvc.perform(post("/api/admin/products")
+                        .session(adminSession)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(productBody("SKU-" + uniqueSuffix(), 2)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long productId = productId(createResult);
+
+        String username = "delete_user_" + uniqueSuffix();
+        mockMvc.perform(post("/api/auth/register/user")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"" + username + "\",\"password\":\"Password123\",\"phone\":\"13600000001\"}"))
+                .andExpect(status().isCreated());
+        MockHttpSession userSession = login(username, "Password123");
+
+        mockMvc.perform(delete("/api/admin/products/{id}", productId).session(userSession))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+
+        mockMvc.perform(delete("/api/admin/products/{id}", productId).session(adminSession))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/products/{id}", productId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PRODUCT_NOT_AVAILABLE"));
     }
 
     private MockHttpSession login(String username, String password) throws Exception {

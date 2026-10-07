@@ -11,6 +11,7 @@ import com.jingxu.catmaintain.mapper.ProductMapper;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -80,6 +81,17 @@ public class ProductService {
             throw new BusinessException(HttpStatus.CONFLICT, "INSUFFICIENT_STOCK", "库存不足，不能减到负数");
         }
         return ProductResponse.from(requireProduct(id));
+    }
+
+    @Transactional
+    public void delete(Long id, HttpSession session) {
+        requireAdminForController(session);
+        requireProduct(id);
+        try {
+            productMapper.deleteById(id);
+        } catch (DataIntegrityViolationException exception) {
+            throw new BusinessException(HttpStatus.CONFLICT, "PRODUCT_IN_USE", "商品已被订单引用，不能删除");
+        }
     }
 
     public Product requireSaleable(Long id) {
