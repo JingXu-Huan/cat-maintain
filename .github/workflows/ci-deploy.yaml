@@ -1,0 +1,143 @@
+name: Build, test and deploy
+
+on:
+  push:
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy this revision to go-server after tests pass
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Java 21 and MySQL integration tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Start isolated test database
+        run: docker compose -p cat-maintain-ci up -d --wait --wait-timeout 120 mysql
+      - name: Test and package backend
+        run: sh ./mvnw --batch-mode --no-transfer-progress verify
+      - name: Upload backend
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend
+          path: target/cat-maintain-0.0.1-SNAPSHOT.jar
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: target/surefire-reports/
+          retention-days: 7
+      - name: Database diagnostics
+        if: failure()
+        run: docker compose -p cat-maintain-ci logs --tail 100 mysql
+      - name: Remove isolated test database
+        if: always()
+        run: docker compose -p cat-maintain-ci down --volumes
+
+  frontend:
+    name: Vue type check and production build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: front
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: front/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - name: Upload frontend
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend
+          path: front/dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    name: Deploy to go-server
+    needs: [backend, frontend]
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/master') ||
+      (github.event_name == 'workflow_dispatch' && inputs.deploy)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: production
+    concurrency:
+      group: cat-maintain-production
+      cancel-in-progress: false
+    env:
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+      RELEASE_ID: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Require current master revision
+        run: |
+          latest=$(git ls-remote origin refs/heads/master | cut -f1)
+          if [ "$latest" != "$GITHUB_SHA" ]; then
+            echo 'master has advanced; deploy the latest revision instead.' >&2
+            exit 1
+          fi
+      - uses: actions/download-artifact@v5
+        with:
+          name: backend
+          path: release/
+      - uses: actions/download-artifact@v5
+        with:
+          name: frontend
+          path: release/front/dist/
+      - name: Assemble verified release
+        run: |
+          mv release/cat-maintain-0.0.1-SNAPSHOT.jar release/backend.jar
+          cp -R deploy db release/
+          printf '%s\n' "$GITHUB_SHA" > release/REVISION
+          cd release
+          find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+          tar -czf "$RUNNER_TEMP/release.tar.gz" .
+      - name: Configure dedicated deployment key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$DEPLOY_HOST" && test -n "$DEPLOY_USER"
+          test -n "$SSH_PRIVATE_KEY" && test -n "$SSH_KNOWN_HOSTS"
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/cat-maintain-deploy"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/cat-maintain-deploy" "$HOME/.ssh/known_hosts"
+      - name: Upload and activate release
+        run: |
+          ssh -i "$HOME/.ssh/cat-maintain-deploy" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8 \
+            -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "deploy $RELEASE_ID" < "$RUNNER_TEMP/release.tar.gz"
+      - name: Release summary
+        run: |
+          printf '### Deployed revision\n\n`%s`\n\nRelease: `%s`\n' "$GITHUB_SHA" "$RELEASE_ID" >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove deployment key
+        if: always()
+        run: rm -f "$HOME/.ssh/cat-maintain-deploy"
