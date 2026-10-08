@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toastSuccess } from '../composables/useToast'
 import { onMounted, ref } from 'vue'
 import { createOrder, listMyOrders } from '../api/orders'
 import { listActiveStores } from '../api/stores'
@@ -53,7 +54,7 @@ async function submitOrder() {
     if (entries.value.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > Math.min(item.product.stock, 99))) throw new Error('商品数量超过库存或不合法，请调整购物车。')
     if (previousAmount !== productAmount.value + laborAmount.value) throw new Error('商品价格或工时费已更新，请查看新金额后再次提交。')
     const order = await createOrder(selectedStoreId.value, entries.value.map((item) => ({ productId: item.product.id, quantity: item.quantity })))
-    clearForAccount(ownerId); hasError.value = false; feedback.value = `订单 ${order.orderNo} 已提交，等待平台审核。`
+    clearForAccount(ownerId); hasError.value = false; toastSuccess(`订单 ${order.orderNo} 已提交，等待平台审核。`)
     await refresh(0)
     emit('changed')
   } catch (error) { hasError.value = true; feedback.value = error instanceof Error ? error.message : '下单失败。' }
@@ -66,7 +67,7 @@ defineExpose({ refresh })
 <template>
   <section id="orders" class="order-panel">
     <div class="section-heading"><div><h2>购物车</h2><p>确认配件数量后，选择接收配件和提供保养的门店。</p></div><button class="secondary-button" type="button" :disabled="isLoading" @click="refresh()">{{ isLoading ? '加载中…' : '刷新订单' }}</button></div>
-    <p v-if="feedback" class="feedback" :class="hasError ? 'error' : 'success'" :role="hasError ? 'alert' : 'status'">{{ feedback }}</p>
+    <p v-if="feedback && hasError" class="feedback error" role="alert">{{ feedback }}</p>
     <DataState v-if="!entries.length" title="购物车还是空的" description="把需要的配件加入购物车，再一起提交订单。"><button class="primary-button" type="button" @click="emit('browse')">去选配件</button></DataState>
     <div v-else class="cart-list">
       <article v-for="item in entries" :key="item.product.id" class="cart-item">

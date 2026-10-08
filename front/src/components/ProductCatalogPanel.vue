@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toastSuccess } from '../composables/useToast'
 import { nextTick, onMounted, ref } from 'vue'
 import { Package, ShoppingCart } from 'lucide'
 import { listProducts } from '../api/products'
@@ -53,7 +54,8 @@ async function refresh(nextPage = page.value, nextSize = pageSize.value) {
 function addToCart(product: Product) {
   const error = add(product)
   hasError.value = error !== null
-  feedback.value = error ?? `${product.productName} 已加入购物车。`
+  feedback.value = error ?? ''
+  if (!error) toastSuccess(`${product.productName} 已加入购物车。`)
 }
 onMounted(() => refresh())
 </script>
@@ -71,7 +73,7 @@ onMounted(() => refresh())
         {{ isLoading ? '加载中…' : '刷新商品' }}
       </button>
     </div>
-    <p v-if="feedback" class="feedback" :class="hasError ? 'error' : 'success'" :role="hasError ? 'alert' : 'status'">
+    <p v-if="feedback && hasError" class="feedback error" role="alert">
       {{ feedback }}
     </p>
     <DataState v-if="isLoading && !products.length" loading title="正在加载配件" />

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toastSuccess } from '../composables/useToast'
 import { computed, onMounted, ref, watch } from 'vue'
 import { cancelAppointment, createAppointment, listMyAppointments } from '../api/appointments'
 import { listMyMaintenanceRecords } from '../api/maintenance'
@@ -66,7 +67,7 @@ async function refresh() {
 }
 async function run(action: () => Promise<unknown>, success: string) {
   processing.value = true; feedback.value = ''
-  try { await action(); hasError.value = false; feedback.value = success; await refresh(); emit('changed') }
+  try { await action(); hasError.value = false; toastSuccess(success); await refresh(); emit('changed') }
   catch (error) { hasError.value = true; feedback.value = error instanceof Error ? error.message : '操作失败。' }
   finally { processing.value = false }
 }
@@ -119,7 +120,7 @@ onMounted(refresh)
 <template>
   <section id="services" class="service-panel">
     <div class="section-heading"><div><h2>预约保养</h2></div><button class="secondary-button" type="button" :disabled="loading || processing" @click="refresh">{{ loading ? '加载中…' : '刷新服务' }}</button></div>
-    <p v-if="feedback" class="feedback" :class="hasError ? 'error' : 'success'" :role="hasError ? 'alert' : 'status'">{{ feedback }}</p>
+    <p v-if="feedback && hasError" class="feedback error" role="alert">{{ feedback }}</p>
     <p class="panel-description">关联购买订单后，服务门店会与订单门店保持一致；也可以直接预约到店服务。</p>
     <form class="service-form" :aria-busy="processing" @submit.prevent="submitAppointment">
       <label>购买订单<select v-model="appointmentForm.orderId" :disabled="loading || processing"><option :value="null">不关联订单（到店服务）</option><option v-for="order in bookableOrders" :key="order.id" :value="order.id">{{ order.orderNo }} · {{ statusLabel(order.status) }}</option></select></label>

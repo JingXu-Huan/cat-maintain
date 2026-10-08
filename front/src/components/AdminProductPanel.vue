@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toastSuccess } from '../composables/useToast'
 import { onMounted, ref } from 'vue'
 import { adjustProductStock, createProduct, deleteProduct, listAdminProducts, updateProduct, updateProductStatus } from '../api/products'
 import type { Product, ProductStatus } from '../types/product'
@@ -45,7 +46,7 @@ async function addProduct() {
     else await createProduct(form.value)
     resetForm()
     hasError.value = false
-    feedback.value = editing ? '商品已保存。' : '商品已创建。'
+    toastSuccess(editing ? '商品已保存。' : '商品已创建。')
     await refresh(editing ? page.value : 0)
   } catch (error) {
     hasError.value = true
@@ -96,7 +97,7 @@ async function act(id: number, action: () => Promise<unknown>, success: string) 
   try {
     await action()
     hasError.value = false
-    feedback.value = success
+    toastSuccess(success)
     await refresh()
   } catch (error) {
     hasError.value = true
@@ -117,7 +118,7 @@ onMounted(() => refresh())
       </div>
       <button class="secondary-button" type="button" :disabled="isLoading || actingId !== null" @click="refresh()">刷新商品</button>
     </div>
-    <p v-if="feedback" class="feedback" :class="hasError ? 'error' : 'success'" :role="hasError ? 'alert' : 'status'">{{ feedback }}</p>
+    <p v-if="feedback && hasError" class="feedback error" role="alert">{{ feedback }}</p>
     <h3 id="product-editor">{{ editingId === null ? '新增商品' : '编辑商品' }}</h3>
     <form class="product-form" :aria-busy="isLoading" @submit.prevent="addProduct">
       <label>商品编码（SKU）<input id="product-sku" v-model.trim="form.sku" placeholder="例如：OIL-5W30-4L" required maxlength="50" :disabled="isLoading || actingId !== null" /></label>

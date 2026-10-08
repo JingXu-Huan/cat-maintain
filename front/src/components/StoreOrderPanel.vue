@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toastSuccess } from '../composables/useToast'
 import { onMounted, ref } from 'vue'
 import { lookupOrderAppointments } from '../api/checkIn'
 import { listStoreOrders, lookupStoreOrder, verifyStoreOrder } from '../api/orders'
@@ -29,14 +30,14 @@ async function lookup() {
   isLoading.value = true; feedback.value = ''
   try {
     const [foundOrder, foundAppointments] = await Promise.all([lookupStoreOrder(code.value), lookupOrderAppointments(code.value)])
-    order.value = foundOrder; appointments.value = foundAppointments; hasError.value = false; feedback.value = '已找到当前门店的订单和关联预约。'
+    order.value = foundOrder; appointments.value = foundAppointments; hasError.value = false; toastSuccess('已找到当前门店的订单和关联预约。')
   } catch (error) { order.value = null; appointments.value = []; hasError.value = true; feedback.value = error instanceof Error ? error.message : '订单查询失败。' }
   finally { isLoading.value = false }
 }
 async function verify() {
   if (!order.value) return
   isLoading.value = true; feedback.value = ''
-  try { order.value = await verifyStoreOrder(order.value.id, code.value); hasError.value = false; feedback.value = '订单已核销。'; await refresh(); emit('changed') }
+  try { order.value = await verifyStoreOrder(order.value.id, code.value); hasError.value = false; toastSuccess('订单已核销。'); await refresh(); emit('changed') }
   catch (error) { hasError.value = true; feedback.value = error instanceof Error ? error.message : '核销失败。' }
   finally { isLoading.value = false }
 }
@@ -47,7 +48,7 @@ onMounted(() => refresh())
   <section class="admin-panel">
     <div class="admin-panel-heading"><div><h2>查询与核销</h2></div><button class="secondary-button" type="button" :disabled="isLoading" @click="refresh()">{{ isLoading ? '加载中…' : '刷新订单' }}</button></div>
     <form class="verify-form" @submit.prevent="lookup"><label>订单核销码<input v-model.trim="code" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" required placeholder="输入 8 位数字" :disabled="isLoading" /></label><button class="primary-button" type="submit" :disabled="isLoading || !/^[0-9]{8}$/.test(code)">查询订单与预约</button></form>
-    <p v-if="feedback" class="feedback" :class="hasError ? 'error' : 'success'" :role="hasError ? 'alert' : 'status'">{{ feedback }}</p>
+    <p v-if="feedback && hasError" class="feedback error" role="alert">{{ feedback }}</p>
     <div v-if="order" class="verify-result">
       <article class="order-item"><div><strong>{{ order.orderNo }}</strong><p>{{ statusLabel(order.status) }} · ¥{{ order.totalAmount }} · {{ order.items.map((item) => `${item.productName} × ${item.quantity}`).join('，') }}</p></div><button class="approve-button" type="button" :disabled="isLoading || order.status !== 'DELIVERED'" @click="verify">{{ order.status === 'VERIFIED' || order.status === 'COMPLETED' ? '已核销' : '确认核销' }}</button></article>
       <article v-for="appointment in appointments" :key="appointment.id" class="history-item"><strong>关联预约 · {{ appointment.vehiclePlate }} · {{ statusLabel(appointment.status) }}</strong><p>{{ formatTime(appointment.appointmentTime) }} · {{ appointment.vehicleModel || '未填写车型' }}</p><p>{{ appointment.checkedInAt ? '到店登记：' + formatTime(appointment.checkedInAt) : '尚未扫码登记' }}</p></article>

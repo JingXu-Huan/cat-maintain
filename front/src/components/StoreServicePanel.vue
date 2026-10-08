@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toastSuccess } from '../composables/useToast'
 import { onMounted, ref, watch } from 'vue'
 import { confirmAppointment, listStoreAppointments, rejectAppointment } from '../api/appointments'
 import { completeMaintenance, listStoreMaintenanceRecords, startMaintenance } from '../api/maintenance'
@@ -36,7 +37,7 @@ async function refresh() {
 }
 async function act(id: number, action: () => Promise<unknown>, success: string) {
   actingId.value = id; feedback.value = ''
-  try { await action(); hasError.value = false; feedback.value = success; await refresh() }
+  try { await action(); hasError.value = false; toastSuccess(success); await refresh() }
   catch (error) { hasError.value = true; feedback.value = error instanceof Error ? error.message : '操作失败。' }
   finally { actingId.value = null }
 }
@@ -55,7 +56,7 @@ onMounted(refresh)
 <template>
   <section class="service-panel">
     <div class="section-heading"><div><h2>门店预约</h2></div><button class="secondary-button" type="button" :disabled="isLoading || actingId !== null" @click="refresh">{{ isLoading ? '加载中…' : '刷新工作台' }}</button></div>
-    <p v-if="feedback" class="feedback" :class="hasError ? 'error' : 'success'" :role="hasError ? 'alert' : 'status'">{{ feedback }}</p>
+    <p v-if="feedback && hasError" class="feedback error" role="alert">{{ feedback }}</p>
     <label class="reject-reason"><span>拒绝预约时的说明</span><input v-model.trim="rejectReason" maxlength="500" :disabled="isLoading || actingId !== null" /></label>
     <DataState v-if="isLoading && !appointments.length" loading title="正在加载预约" />
     <div class="order-list">

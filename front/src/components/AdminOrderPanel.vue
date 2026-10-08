@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toastSuccess } from '../composables/useToast'
 import { onMounted, ref } from 'vue'
 import { approveOrder, deliverOrder, listAdminOrders, rejectOrder } from '../api/orders'
 import type { Order } from '../types/order'
@@ -23,7 +24,7 @@ async function refresh(nextPage = page.value) {
 async function act(id: number, action: () => Promise<Order>, success: string) {
   actingId.value = id
   feedback.value = ''
-  try { await action(); hasError.value = false; feedback.value = success; await refresh() } catch (error) { hasError.value = true; feedback.value = error instanceof Error ? error.message : '订单操作失败。' } finally { actingId.value = null }
+  try { await action(); hasError.value = false; toastSuccess(success); await refresh() } catch (error) { hasError.value = true; feedback.value = error instanceof Error ? error.message : '订单操作失败。' } finally { actingId.value = null }
 }
 onMounted(() => refresh())
 </script>
@@ -31,7 +32,7 @@ onMounted(() => refresh())
 <template>
   <section class="admin-panel">
     <div class="admin-panel-heading"><div><h2>订单审批与配送</h2></div><button class="secondary-button" type="button" :disabled="isLoading || actingId !== null" @click="refresh()">{{ isLoading ? '加载中…' : '刷新订单' }}</button></div>
-    <p v-if="feedback" class="feedback" :class="hasError ? 'error' : 'success'" :role="hasError ? 'alert' : 'status'">{{ feedback }}</p>
+    <p v-if="feedback && hasError" class="feedback error" role="alert">{{ feedback }}</p>
     <label class="reject-reason"><span>拒绝订单时的说明</span><input v-model.trim="rejectReason" maxlength="255" :disabled="isLoading || actingId !== null" /></label>
     <DataState v-if="isLoading && !orders.length" loading title="正在加载订单" />
     <div class="admin-product-list">

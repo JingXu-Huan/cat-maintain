@@ -17,6 +17,7 @@ import StoreOrderPanel from './components/StoreOrderPanel.vue'
 import StoreQrPanel from './components/StoreQrPanel.vue'
 import StoreServicePanel from './components/StoreServicePanel.vue'
 import UiIcon from './components/UiIcon.vue'
+import ToastHost from './components/ToastHost.vue'
 import UserServicePanel from './components/UserServicePanel.vue'
 import { setCartAccount, useCart } from './composables/useCart'
 import type { AccountResponse } from './types/auth'
@@ -131,6 +132,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', followHash))
 </script>
 
 <template>
+  <ToastHost />
   <a class="skip-link" href="#workspace">跳到主要内容</a>
   <div class="app-shell">
     <aside class="sidebar" aria-label="应用导航">

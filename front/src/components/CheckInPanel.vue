@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toastSuccess } from '../composables/useToast'
 import { computed, ref, watch } from 'vue'
 import { listMyAppointments } from '../api/appointments'
 import { checkIn } from '../api/checkIn'
@@ -38,7 +39,7 @@ async function submit() {
     const response = await checkIn(props.storeId, appointmentId.value, code.value)
     const index = appointments.value.findIndex((appointment) => appointment.id === response.appointment.id)
     if (index >= 0) appointments.value[index] = response.appointment
-    hasError.value = false; feedback.value = '到店登记成功，门店可以开始保养。'; emit('changed')
+    hasError.value = false; toastSuccess('到店登记成功，门店可以开始保养。'); emit('changed')
   } catch (error) { hasError.value = true; feedback.value = error instanceof Error ? error.message : '到店登记失败。' }
   finally { busy.value = false }
 }
@@ -49,7 +50,7 @@ watch(() => [props.storeId, props.account?.id], () => { code.value = ''; appoint
   <section id="check-in" class="service-panel">
     <div class="section-heading"><div><h2>到店登记{{ store ? ' · ' + store.storeName : '' }}</h2></div><button class="secondary-button" type="button" :disabled="busy" @click="load">{{ busy ? '加载中…' : '刷新预约' }}</button></div>
     <p v-if="store">{{ store.address }}</p>
-    <p v-if="feedback" class="feedback" :class="hasError ? 'error' : 'success'" :role="hasError ? 'alert' : 'status'">{{ feedback }}</p>
+    <p v-if="feedback && hasError" class="feedback error" role="alert">{{ feedback }}</p>
     <div v-if="!props.account" class="sign-in-notice"><p>请使用预约所属账号登录，再选择预约并输入订单中的 8 位核销码。登录后会返回本店登记页面。</p><button type="button" class="primary-button" @click="emit('signIn')">登录并继续登记</button></div>
     <p v-else-if="props.account.role !== 'USER'">请使用购买订单的用户账号登记。</p>
     <form v-else-if="store" class="service-form" @submit.prevent="submit">

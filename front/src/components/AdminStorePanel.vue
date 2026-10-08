@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toastSuccess } from '../composables/useToast'
 import { onMounted, ref } from 'vue'
 import { approveStore, listStoreApplications, rejectStore } from '../api/admin'
 import type { StoreApplication } from '../types/store'
@@ -29,7 +30,7 @@ async function approve(application: StoreApplication) {
   try {
     await approveStore(application.id)
     hasError.value = false
-    feedback.value = `已通过「${application.storeName}」的申请。`
+    toastSuccess(`已通过「${application.storeName}」的申请。`)
     await refresh()
   } catch (error) {
     hasError.value = true
@@ -45,7 +46,7 @@ async function reject(application: StoreApplication) {
   try {
     await rejectStore(application.id, rejectReason.value)
     hasError.value = false
-    feedback.value = `已拒绝「${application.storeName}」的申请。`
+    toastSuccess(`已拒绝「${application.storeName}」的申请。`)
     await refresh()
   } catch (error) {
     hasError.value = true
@@ -69,7 +70,7 @@ onMounted(refresh)
       </button>
     </div>
 
-    <p v-if="feedback" class="feedback" :class="hasError ? 'error' : 'success'" :role="hasError ? 'alert' : 'status'">
+    <p v-if="feedback && hasError" class="feedback error" role="alert">
       {{ feedback }}
     </p>
 

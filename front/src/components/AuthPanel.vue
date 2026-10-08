@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toastSuccess } from '../composables/useToast'
 import { computed, nextTick, ref } from 'vue'
 import { login, logout, registerStore, registerUser } from '../api/auth'
 import type { AccountResponse } from '../types/auth'
@@ -11,13 +12,12 @@ const emit = defineEmits<{
 
 type FormMode = 'login' | 'register'
 type RegisterRole = 'user' | 'store'
-type FeedbackKind = 'success' | 'error'
 type FieldName = 'username' | 'password' | 'phone' | 'storeName' | 'contactName' | 'address'
 
 const formMode = ref<FormMode>('login')
 const registerRole = ref<RegisterRole>('user')
 const isSubmitting = ref(false)
-const feedback = ref<{ kind: FeedbackKind; message: string } | null>(null)
+const feedback = ref<{ kind: 'error'; message: string } | null>(null)
 
 const username = ref('')
 const password = ref('')
@@ -108,11 +108,11 @@ async function submit() {
   try {
     if (formMode.value === 'login') {
       const result = await login({ username: username.value, password: password.value })
-      feedback.value = { kind: 'success', message: '登录成功。' }
+      toastSuccess('登录成功。')
       emit('loggedIn', result.account)
     } else if (registerRole.value === 'user') {
       await registerUser({ username: username.value, password: password.value, phone: phone.value })
-      feedback.value = { kind: 'success', message: '用户注册成功，现在可以登录。' }
+      toastSuccess('用户注册成功，现在可以登录。')
       formMode.value = 'login'
       resetValidation()
     } else {
@@ -124,7 +124,7 @@ async function submit() {
         phone: phone.value,
         address: address.value,
       })
-      feedback.value = { kind: 'success', message: result.message }
+      toastSuccess(result.message)
       formMode.value = 'login'
       resetValidation()
     }
@@ -144,7 +144,7 @@ async function signOut() {
   try {
     await logout()
     emit('loggedOut')
-    feedback.value = { kind: 'success', message: '已退出登录。' }
+    toastSuccess('已退出登录。')
   } catch (error) {
     feedback.value = {
       kind: 'error',
@@ -380,7 +380,7 @@ function roleLabel(role: 'USER' | 'STORE' | 'ADMIN') {
         </form>
       </template>
 
-      <p v-if="feedback" class="feedback" :class="feedback.kind" :role="feedback.kind === 'error' ? 'alert' : 'status'">
+      <p v-if="feedback" class="feedback error" role="alert">
         {{ feedback.message }}
       </p>
     </div>
