@@ -35,3 +35,5 @@ build/
 ### Local environment ###
 .env
 !.env.example
+front/node_modules/
+front/dist/

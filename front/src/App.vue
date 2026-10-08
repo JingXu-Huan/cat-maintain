@@ -1,184 +1,197 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { CalendarDays, CarFront, ClipboardCheck, MapPin, Menu, Package, QrCode, ShoppingCart, Store, Truck, UserRound, Wrench, X } from 'lucide'
+import { MorphIcon } from 'morphicons/vue'
 import { getCurrentAccount } from './api/auth'
 import { getJson } from './api/http'
 import AdminProductPanel from './components/AdminProductPanel.vue'
 import AdminOrderPanel from './components/AdminOrderPanel.vue'
 import AdminStorePanel from './components/AdminStorePanel.vue'
 import AuthPanel from './components/AuthPanel.vue'
+import CheckInPanel from './components/CheckInPanel.vue'
+import DataState from './components/DataState.vue'
 import OrderPanel from './components/OrderPanel.vue'
 import ProductCatalogPanel from './components/ProductCatalogPanel.vue'
+import StoreCatalogPanel from './components/StoreCatalogPanel.vue'
 import StoreOrderPanel from './components/StoreOrderPanel.vue'
+import StoreQrPanel from './components/StoreQrPanel.vue'
 import StoreServicePanel from './components/StoreServicePanel.vue'
+import UiIcon from './components/UiIcon.vue'
 import UserServicePanel from './components/UserServicePanel.vue'
+import { setCartAccount, useCart } from './composables/useCart'
 import type { AccountResponse } from './types/auth'
 import type { HealthResponse } from './types/health'
+import type { Order } from './types/order'
 
+type View = 'catalog' | 'stores' | 'orders' | 'services' | 'store-orders' | 'store-services' | 'store-qr' | 'admin-stores' | 'admin-products' | 'admin-orders' | 'check-in' | 'account'
 type ApiStatus = 'checking' | 'up' | 'offline'
 
-interface PlatformModule {
-  label: string
-  title: string
-  description: string
-  accent: string
+const views = {
+  catalog: { label: '配件商城', title: '选好配件，再安排保养', description: '配件与工时费分别计价，下单时选择配送和保养门店。', icon: Package },
+  stores: { label: '服务门店', title: '找到你的保养门店', description: '查看门店地址、联系方式和车主评价，再安排到店服务。', icon: MapPin },
+  orders: { label: '购物车与订单', title: '从选购到到店，一目了然', description: '确认购物车、选择门店，随时查看订单进度和核销码。', icon: ShoppingCart },
+  services: { label: '预约与保养', title: '把下一次保养安排好', description: '预约到店时间，查看保养记录，并为已完成的订单留下评价。', icon: CalendarDays },
+  'store-orders': { label: '订单核销', title: '核对订单，准备接待', description: '输入用户的 8 位核销码，查询订单和关联预约。', icon: ClipboardCheck },
+  'store-services': { label: '预约与保养', title: '今天的服务，从这里开始', description: '处理预约、开始保养，完成后记录服务内容与车辆里程。', icon: Wrench },
+  'store-qr': { label: '到店二维码', title: '让用户扫码登记到店', description: '生成本店登记二维码，供用户到店时选择预约并核对订单。', icon: QrCode },
+  'admin-stores': { label: '加盟店审核', title: '审核新门店的加盟申请', description: '核对申请资料，通过审核后门店即可登录并提供服务。', icon: Store },
+  'admin-products': { label: '商品与库存', title: '维护配件，管理可售库存', description: '编辑商品信息、配件价格和工时费，调整库存与上架状态。', icon: Package },
+  'admin-orders': { label: '订单与配送', title: '处理订单，推进配送', description: '审核用户订单，配送后生成供门店核销的凭据。', icon: Truck },
+  'check-in': { label: '扫码到店登记', title: '已经到店？完成登记', description: '使用预约所属账号登录，选择已确认预约并输入订单核销码。', icon: QrCode },
+  account: { label: '我的账户', title: '管理你的账户', description: '登录后继续购买配件、预约保养，或管理门店与平台业务。', icon: UserRound },
+} satisfies Record<View, { label: string; title: string; description: string; icon: typeof Package }>
+
+const initialHash = window.location.hash.slice(1) as View
+const checkInStoreId = Number(new URLSearchParams(window.location.search).get('checkInStore'))
+const hasCheckIn = Number.isSafeInteger(checkInStoreId) && checkInStoreId > 0
+const activeView = ref<View>(hasCheckIn ? 'check-in' : initialHash in views ? initialHash : 'catalog')
+const visited = ref(new Set<View>([activeView.value]))
+const mobileMenuOpen = ref(false)
+const mobileMenuToggle = ref<HTMLButtonElement | null>(null)
+const workspace = ref<HTMLElement | null>(null)
+const sessionReady = ref(false)
+const apiStatus = ref<ApiStatus>('checking')
+const currentAccount = ref<AccountResponse | null>(null)
+const orderToBook = ref<Order | null>(null)
+const serviceRevision = ref(0)
+const orderPanel = ref<InstanceType<typeof OrderPanel> | null>(null)
+const { itemCount } = useCart()
+const roleLabel = computed(() => currentAccount.value ? { USER: '车主服务', STORE: '门店工作台', ADMIN: '平台工作台' }[currentAccount.value.role] : '汽车保养服务')
+const navigation = computed<View[]>(() => {
+  const role = currentAccount.value?.role
+  const items: View[] = role === 'ADMIN' ? ['admin-stores', 'admin-products', 'admin-orders']
+    : role === 'STORE' ? ['store-orders', 'store-services', 'store-qr']
+      : role === 'USER' ? ['catalog', 'stores', 'orders', 'services'] : ['catalog', 'stores']
+  if (hasCheckIn) items.push('check-in')
+  items.push('account')
+  return items
+})
+const activePage = computed(() => views[activeView.value])
+
+function navigate(view: View, focus = true, replace = false) {
+  if (!navigation.value.includes(view)) return
+  activeView.value = view
+  visited.value.add(view)
+  mobileMenuOpen.value = false
+  if (replace || window.location.hash !== `#${view}`) {
+    window.history[replace ? 'replaceState' : 'pushState'](null, '', `${window.location.pathname}${window.location.search}#${view}`)
+  }
+  document.title = `${views[view].label} · 汽车保养平台`
+  if (focus) void nextTick(() => {
+    workspace.value?.focus({ preventScroll: true })
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  })
 }
 
-const apiStatus = ref<ApiStatus>('checking')
-const apiMessage = ref('正在检查后端接口')
-const currentAccount = ref<AccountResponse | null>(null)
+function followHash() {
+  const hash = window.location.hash.slice(1) as View
+  if (hash in views) navigate(hash, true, true)
+}
 
-const platformModules: PlatformModule[] = [
-  {
-    label: '用户端',
-    title: '选配件 · 下单 · 预约',
-    description: '覆盖注册登录、商品浏览、购物车、订单、到店预约和保养记录。',
-    accent: 'blue',
-  },
-  {
-    label: '加盟店端',
-    title: '接单 · 核销 · 留存',
-    description: '支持加盟店注册，凭数字凭据调取订单与预约，完成到店保养登记。',
-    accent: 'green',
-  },
-  {
-    label: '平台管理端',
-    title: '审核 · 商品 · 库存',
-    description: '平台审核加盟店和用户订单，维护汽车零配件、价格及保养工时费。',
-    accent: 'orange',
-  },
-]
+function closeMobileMenu() {
+  if (!mobileMenuOpen.value) return
+  mobileMenuOpen.value = false
+  void nextTick(() => mobileMenuToggle.value?.focus())
+}
+
+watch(() => currentAccount.value?.id, () => {
+  setCartAccount(currentAccount.value?.role === 'USER' ? currentAccount.value.id : null)
+  orderToBook.value = null
+  serviceRevision.value++
+  if (sessionReady.value) {
+    const destination: View = hasCheckIn && (!currentAccount.value || currentAccount.value.role === 'USER') ? 'check-in' : navigation.value[0]!
+    visited.value = new Set([destination])
+    navigate(destination)
+  }
+}, { immediate: true, flush: 'sync' })
+
+function checkInChanged() { serviceRevision.value++; void orderPanel.value?.refresh() }
+function bookOrder(order: Order) { orderToBook.value = { ...order }; navigate('services') }
 
 async function checkApi() {
   apiStatus.value = 'checking'
-  apiMessage.value = '正在检查后端接口'
-
   try {
     const health = await getJson<HealthResponse>('/api/health')
     apiStatus.value = health.status === 'UP' ? 'up' : 'offline'
-    apiMessage.value = apiStatus.value === 'up' ? '后端已连接' : '后端状态异常'
-  } catch (error) {
-    apiStatus.value = 'offline'
-    apiMessage.value = error instanceof Error ? error.message : '暂时无法连接后端'
-  }
-}
-
-async function loadCurrentAccount() {
-  try {
-    currentAccount.value = await getCurrentAccount()
-  } catch {
-    currentAccount.value = null
-  }
+  } catch { apiStatus.value = 'offline' }
 }
 
 onMounted(async () => {
-  await checkApi()
-  await loadCurrentAccount()
+  window.addEventListener('hashchange', followHash)
+  await Promise.all([
+    checkApi(),
+    getCurrentAccount().then((account) => { currentAccount.value = account }).catch(() => { currentAccount.value = null }),
+  ])
+  sessionReady.value = true
+  if (!navigation.value.includes(activeView.value)) activeView.value = navigation.value[0]!
+  visited.value = new Set([activeView.value])
+  navigate(activeView.value, false, true)
 })
+onBeforeUnmount(() => window.removeEventListener('hashchange', followHash))
 </script>
 
 <template>
+  <a class="skip-link" href="#workspace">跳到主要内容</a>
   <div class="app-shell">
-    <header class="topbar">
-      <a class="brand" href="/" aria-label="汽车保养平台首页">
-        <span class="brand-mark">CM</span>
-        <span>
-          <strong>汽车保养平台</strong>
-          <small>Car Maintain</small>
-        </span>
+    <aside class="sidebar" aria-label="应用导航">
+      <a class="brand" :href="`#${navigation[0]}`" @click.prevent="navigate(navigation[0]!)">
+        <span class="brand-mark"><UiIcon :icon="CarFront" :size="23" /></span>
+        <span><strong>汽车保养平台</strong><small>配件购买 · 到店保养</small></span>
       </a>
-
-      <div class="topbar-actions">
-        <span class="environment-tag">初始化环境</span>
-        <button class="status-button" type="button" @click="checkApi">
-          <span class="status-dot" :class="apiStatus" aria-hidden="true"></span>
-          {{ apiMessage }}
-        </button>
+      <button ref="mobileMenuToggle" class="icon-button mobile-menu-toggle" type="button" :aria-expanded="mobileMenuOpen" aria-controls="workspace-navigation" :aria-label="mobileMenuOpen ? '收起导航' : '展开导航'" @click="mobileMenuOpen = !mobileMenuOpen">
+        <MorphIcon :icon="mobileMenuOpen ? X : Menu" :size="22" spring="snappy" reduced-motion="user" />
+      </button>
+      <div id="workspace-navigation" class="sidebar-content" :class="{ 'is-open': mobileMenuOpen }" @keydown.esc="closeMobileMenu">
+        <p class="nav-caption">{{ roleLabel }}</p>
+        <nav class="workspace-nav" aria-label="工作台页面">
+          <a v-for="view in navigation" :key="view" :href="`#${view}`" class="nav-link" :class="{ active: activeView === view }" :aria-current="activeView === view ? 'page' : undefined" @click.prevent="navigate(view)">
+            <UiIcon :icon="views[view].icon" :size="19" />
+            <span>{{ view === 'account' && !currentAccount ? '登录 / 注册' : views[view].label }}</span>
+            <span v-if="view === 'orders' && itemCount" class="nav-count" :aria-label="`购物车 ${itemCount} 件`">{{ itemCount }}</span>
+          </a>
+        </nav>
+        <div class="sidebar-bottom">
+          <a class="sidebar-account" href="#account" @click.prevent="navigate('account')"><span class="account-avatar"><UiIcon :icon="UserRound" :size="18" /></span><span><strong>{{ currentAccount?.username || '尚未登录' }}</strong><small>{{ currentAccount ? '查看账户与登录状态' : '登录后安排保养服务' }}</small></span></a>
+          <p>让每一次保养，有据可查。</p>
+        </div>
       </div>
-    </header>
+    </aside>
 
-    <main>
-      <section class="hero-section">
-        <div class="hero-copy">
-          <p class="eyebrow">JAVA ENTERPRISE PROJECT PRACTICE</p>
-          <h1>让每一次保养，<span>有据可查。</span></h1>
-          <p class="hero-description">
-            面向用户、加盟店与平台管理人员的汽车配件购买和到店保养协同平台。
-            当前前后端基础工程已就绪，后续功能按角色和业务流程逐步接入。
-          </p>
-          <div class="hero-actions">
-            <button class="primary-button" type="button" @click="checkApi">检查后端连接</button>
-            <a class="secondary-button" href="#modules">查看模块规划</a>
-          </div>
+    <div class="workspace-shell">
+      <header class="topbar">
+        <span class="workspace-context">{{ roleLabel }}<span aria-hidden="true"> / </span><strong>{{ activePage.label }}</strong></span>
+        <div class="topbar-actions">
+          <a v-if="currentAccount?.role === 'USER'" class="cart-shortcut" href="#orders" @click.prevent="navigate('orders')"><UiIcon :icon="ShoppingCart" :size="18" /><span>购物车</span><span class="nav-count">{{ itemCount }}</span></a>
+          <button class="status-button" type="button" :disabled="apiStatus === 'checking'" :aria-label="apiStatus === 'checking' ? '正在连接服务' : '重新检查服务连接'" @click="checkApi"><span class="status-dot" :class="apiStatus" aria-hidden="true"></span>{{ apiStatus === 'checking' ? '连接中' : apiStatus === 'up' ? '服务已连接' : '服务未连接' }}</button>
         </div>
+      </header>
 
-        <div class="hero-card" aria-label="项目状态">
-          <div class="hero-card-header">
-            <span>PROJECT STATUS</span>
-            <span class="live-label"><i></i> DEV</span>
-          </div>
-          <div class="hero-card-number">01</div>
-          <div class="hero-card-title">基础工程初始化</div>
-          <div class="progress-track"><span></span></div>
-          <div class="hero-card-footer">
-            <span>Spring Boot + MyBatis</span>
-            <span>Vue + Vite</span>
-          </div>
+      <main id="workspace" ref="workspace" class="workspace-main" tabindex="-1">
+        <div class="page-heading"><h1>{{ activePage.title }}</h1><p>{{ activePage.description }}</p></div>
+        <div v-if="apiStatus === 'offline'" class="connection-notice" role="status"><span><strong>服务暂时无法连接</strong><span>数据加载或操作失败时，请稍后重试。</span></span><button class="secondary-button compact-button" type="button" @click="checkApi">重新连接</button></div>
+        <DataState v-if="!sessionReady" loading title="正在加载你的工作台" />
+        <div v-else :key="currentAccount?.id ?? 'guest'" class="workspace-content">
+          <ProductCatalogPanel v-if="visited.has('catalog')" v-show="activeView === 'catalog'" :can-shop="currentAccount?.role === 'USER'" @sign-in="navigate('account')" />
+          <StoreCatalogPanel v-if="visited.has('stores')" v-show="activeView === 'stores'" />
+          <AuthPanel v-if="visited.has('account')" v-show="activeView === 'account'" :account="currentAccount" @logged-in="currentAccount = $event" @logged-out="currentAccount = null" />
+          <CheckInPanel v-if="hasCheckIn && visited.has('check-in')" v-show="activeView === 'check-in'" :store-id="checkInStoreId" :account="currentAccount" @changed="checkInChanged" @sign-in="navigate('account')" />
+          <template v-if="currentAccount?.role === 'USER'">
+            <OrderPanel v-if="visited.has('orders')" v-show="activeView === 'orders'" ref="orderPanel" @changed="serviceRevision++" @book="bookOrder" @browse="navigate('catalog')" />
+            <UserServicePanel v-if="visited.has('services')" v-show="activeView === 'services'" :order-to-book="orderToBook" :revision="serviceRevision" @changed="orderPanel?.refresh()" />
+          </template>
+          <template v-if="currentAccount?.role === 'ADMIN'">
+            <AdminStorePanel v-if="visited.has('admin-stores')" v-show="activeView === 'admin-stores'" />
+            <AdminProductPanel v-if="visited.has('admin-products')" v-show="activeView === 'admin-products'" />
+            <AdminOrderPanel v-if="visited.has('admin-orders')" v-show="activeView === 'admin-orders'" />
+          </template>
+          <template v-if="currentAccount?.role === 'STORE'">
+            <StoreOrderPanel v-if="visited.has('store-orders')" v-show="activeView === 'store-orders'" @changed="serviceRevision++" />
+            <StoreServicePanel v-if="visited.has('store-services')" v-show="activeView === 'store-services'" :revision="serviceRevision" />
+            <StoreQrPanel v-if="visited.has('store-qr')" v-show="activeView === 'store-qr'" />
+          </template>
         </div>
-      </section>
-
-      <section id="modules" class="modules-section">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">DOMAIN MODULES</p>
-            <h2>从三类角色出发组织业务</h2>
-          </div>
-          <p>按任务书中的注册、审核、购买、配送、预约、核销和保养记录拆分。</p>
-        </div>
-
-        <div class="module-grid">
-          <article v-for="module in platformModules" :key="module.label" class="module-card">
-            <div class="module-icon" :class="module.accent">{{ module.label.slice(0, 1) }}</div>
-            <p class="module-label">{{ module.label }}</p>
-            <h3>{{ module.title }}</h3>
-            <p>{{ module.description }}</p>
-            <span class="module-arrow" aria-hidden="true">↗</span>
-          </article>
-        </div>
-      </section>
-
-      <AuthPanel
-        :account="currentAccount"
-        @logged-in="currentAccount = $event"
-        @logged-out="currentAccount = null"
-      />
-
-      <ProductCatalogPanel />
-
-      <OrderPanel v-if="currentAccount?.role === 'USER'" />
-      <UserServicePanel v-if="currentAccount?.role === 'USER'" />
-
-      <AdminStorePanel v-if="currentAccount?.role === 'ADMIN'" />
-      <AdminProductPanel v-if="currentAccount?.role === 'ADMIN'" />
-      <AdminOrderPanel v-if="currentAccount?.role === 'ADMIN'" />
-      <StoreOrderPanel v-if="currentAccount?.role === 'STORE'" />
-      <StoreServicePanel v-if="currentAccount?.role === 'STORE'" />
-
-      <section class="stack-section">
-        <div class="stack-heading">
-          <p class="eyebrow">CURRENT STACK</p>
-          <h2>清晰的前后端边界</h2>
-        </div>
-        <div class="stack-list">
-          <div><strong>01</strong><span>Spring Boot 4</span><small>Java 21 · REST API</small></div>
-          <div><strong>02</strong><span>后端数据层</span><small>MyBatis · MySQL</small></div>
-          <div><strong>03</strong><span>Vue 3</span><small>TypeScript · Vite</small></div>
-        </div>
-      </section>
-    </main>
-
-    <footer class="footer">
-      <span>cat-maintain</span>
-      <span>前端目录：D:\WorkSpace\cat-maintain\front</span>
-    </footer>
+      </main>
+      <footer class="footer"><span>汽车保养平台</span><span>配件购买与到店保养服务</span></footer>
+    </div>
   </div>
 </template>

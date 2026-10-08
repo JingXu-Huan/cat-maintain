@@ -27,6 +27,10 @@ export function updateProductStatus(id: number, status: ProductStatus) {
   return putJson<Product>(`/api/admin/products/${id}/status`, { status })
 }
 
+export function updateProduct(id: number, input: Parameters<typeof createProduct>[0]) {
+  return putJson<Product>(`/api/admin/products/${id}`, input)
+}
+
 export function adjustProductStock(id: number, delta: number) {
   return postJson<Product>(`/api/admin/products/${id}/stock`, { delta })
 }

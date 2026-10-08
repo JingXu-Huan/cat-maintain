@@ -17,6 +17,7 @@ public class Order {
     private Long accountId;
     private Long storeId;
     private OrderStatus status;
+    private boolean stockDeducted;
     private BigDecimal productAmount;
     private BigDecimal laborFeeAmount;
     private BigDecimal totalAmount;

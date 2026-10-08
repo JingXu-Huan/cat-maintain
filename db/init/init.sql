@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS orders (
     account_id BIGINT UNSIGNED NOT NULL,
     store_id BIGINT UNSIGNED NOT NULL,
     status VARCHAR(30) NOT NULL DEFAULT 'PENDING_APPROVAL',
+    stock_deducted BOOLEAN NOT NULL DEFAULT FALSE,
     product_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     labor_fee_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     total_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
@@ -166,6 +167,59 @@ SET @sql = IF(
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+
+-- 到店登记时间采用幂等迁移，已有数据卷也可以重新导入本脚本。
+-- 旧版本下单即扣库存，已有订单标记为已扣减，防止升级后配送时再扣一次。
+SET @sql = IF(
+    (SELECT COUNT(*) FROM information_schema.columns
+     WHERE table_schema = DATABASE() AND table_name = 'orders' AND column_name = 'stock_deducted') = 0,
+    'ALTER TABLE orders ADD COLUMN stock_deducted BOOLEAN NOT NULL DEFAULT TRUE AFTER status',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+ALTER TABLE orders ALTER COLUMN stock_deducted SET DEFAULT FALSE;
+
+-- 修复旧版本被拒绝订单未返还的库存；标记与库存同事务更新，重复导入不会重复返还。
+START TRANSACTION;
+UPDATE products p
+JOIN (
+    SELECT i.product_id, SUM(i.quantity) AS quantity
+    FROM order_items i JOIN orders o ON o.id = i.order_id
+    WHERE o.status = 'REJECTED' AND o.stock_deducted = TRUE
+    GROUP BY i.product_id
+) reserved ON reserved.product_id = p.id
+SET p.stock = p.stock + reserved.quantity;
+UPDATE orders SET stock_deducted = FALSE WHERE status = 'REJECTED' AND stock_deducted = TRUE;
+COMMIT;
+
+SET @sql = IF(
+    (SELECT COUNT(*) FROM information_schema.columns
+     WHERE table_schema = DATABASE() AND table_name = 'appointments' AND column_name = 'checked_in_at') = 0,
+    'ALTER TABLE appointments ADD COLUMN checked_in_at DATETIME NULL AFTER remark',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+CREATE TABLE IF NOT EXISTS product_reviews (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    account_id BIGINT UNSIGNED NOT NULL,
+    order_id BIGINT UNSIGNED NOT NULL,
+    product_id BIGINT UNSIGNED NOT NULL,
+    rating TINYINT UNSIGNED NOT NULL,
+    content VARCHAR(500) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_product_reviews_account_order_product (account_id, order_id, product_id),
+    KEY idx_product_reviews_product_created (product_id, created_at),
+    CONSTRAINT fk_product_reviews_account FOREIGN KEY (account_id) REFERENCES accounts (id),
+    CONSTRAINT fk_product_reviews_order FOREIGN KEY (order_id) REFERENCES orders (id),
+    CONSTRAINT fk_product_reviews_product FOREIGN KEY (product_id) REFERENCES products (id),
+    CONSTRAINT chk_product_reviews_rating CHECK (rating BETWEEN 1 AND 5)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 SET @sql = IF(
     (SELECT COUNT(*) FROM information_schema.columns

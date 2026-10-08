@@ -44,12 +44,16 @@ public class AppointmentService {
             throw new BusinessException(HttpStatus.NOT_FOUND, "STORE_NOT_FOUND", "目标加盟店不存在或未启用");
         }
         if (request.orderId() != null) {
-            Order order = orderService.requireOrder(request.orderId());
+            Order order = orderService.requireOrderForUpdate(request.orderId());
             if (!order.getAccountId().equals(account.getId()) || !order.getStoreId().equals(store.getId())) {
                 throw new BusinessException(HttpStatus.FORBIDDEN, "APPOINTMENT_ORDER_ACCESS_DENIED", "订单不属于当前用户或门店");
             }
             if (!EnumSet.of(OrderStatus.APPROVED, OrderStatus.DELIVERED, OrderStatus.VERIFIED).contains(order.getStatus())) {
                 throw new BusinessException(HttpStatus.CONFLICT, "ORDER_NOT_READY_FOR_APPOINTMENT", "订单当前状态不能预约");
+            }
+            if (appointmentMapper.findByOrderId(order.getId()).stream().anyMatch(existing ->
+                    existing.getStatus() != AppointmentStatus.CANCELLED && existing.getStatus() != AppointmentStatus.REJECTED)) {
+                throw new BusinessException(HttpStatus.CONFLICT, "ORDER_ALREADY_APPOINTED", "该订单已有有效预约，请先取消原预约");
             }
         }
         Appointment appointment = new Appointment();
