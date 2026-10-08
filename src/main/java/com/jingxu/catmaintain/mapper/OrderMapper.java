@@ -16,15 +16,18 @@ import java.util.List;
 public interface OrderMapper {
 
     @Select("""
-            SELECT id, order_no, account_id, store_id, status, product_amount, labor_fee_amount, total_amount,
+            SELECT id, order_no, account_id, store_id, status, stock_deducted, product_amount, labor_fee_amount, total_amount,
                    verification_code, rejected_reason, approved_at, delivered_at, verified_at,
                    verified_by_store_id, completed_at, created_at, updated_at
             FROM orders WHERE id = #{id}
             """)
     Order findById(@Param("id") Long id);
 
+    @Select("SELECT * FROM orders WHERE id = #{id} FOR UPDATE")
+    Order findByIdForUpdate(@Param("id") Long id);
+
     @Select("""
-            SELECT id, order_no, account_id, store_id, status, product_amount, labor_fee_amount, total_amount,
+            SELECT id, order_no, account_id, store_id, status, stock_deducted, product_amount, labor_fee_amount, total_amount,
                    verification_code, rejected_reason, approved_at, delivered_at, verified_at,
                    verified_by_store_id, completed_at, created_at, updated_at
             FROM orders WHERE verification_code = #{code}
@@ -33,7 +36,7 @@ public interface OrderMapper {
 
     @Select("""
             <script>
-            SELECT id, order_no, account_id, store_id, status, product_amount, labor_fee_amount, total_amount,
+            SELECT id, order_no, account_id, store_id, status, stock_deducted, product_amount, labor_fee_amount, total_amount,
                    verification_code, rejected_reason, approved_at, delivered_at, verified_at,
                    verified_by_store_id, completed_at, created_at, updated_at
             FROM orders
@@ -75,8 +78,8 @@ public interface OrderMapper {
     List<OrderItem> findItemsByOrderIds(@Param("orderIds") List<Long> orderIds);
 
     @Insert("""
-            INSERT INTO orders (order_no, account_id, store_id, status, product_amount, labor_fee_amount, total_amount)
-            VALUES (#{orderNo}, #{accountId}, #{storeId}, #{status}, #{productAmount}, #{laborFeeAmount}, #{totalAmount})
+            INSERT INTO orders (order_no, account_id, store_id, status, stock_deducted, product_amount, labor_fee_amount, total_amount)
+            VALUES (#{orderNo}, #{accountId}, #{storeId}, #{status}, FALSE, #{productAmount}, #{laborFeeAmount}, #{totalAmount})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id", keyColumn = "id")
     int insert(Order order);
@@ -101,13 +104,13 @@ public interface OrderMapper {
     int approve(@Param("id") Long id);
 
     @Update("""
-            UPDATE orders SET status = 'REJECTED', rejected_reason = #{reason}
+            UPDATE orders SET status = 'REJECTED', rejected_reason = #{reason}, stock_deducted = FALSE
             WHERE id = #{id} AND status = 'PENDING_APPROVAL'
             """)
     int reject(@Param("id") Long id, @Param("reason") String reason);
 
     @Update("""
-            UPDATE orders SET status = 'DELIVERED', verification_code = #{code}, delivered_at = CURRENT_TIMESTAMP
+            UPDATE orders SET status = 'DELIVERED', verification_code = #{code}, delivered_at = CURRENT_TIMESTAMP, stock_deducted = TRUE
             WHERE id = #{id} AND status = 'APPROVED'
             """)
     int deliver(@Param("id") Long id, @Param("code") String code);

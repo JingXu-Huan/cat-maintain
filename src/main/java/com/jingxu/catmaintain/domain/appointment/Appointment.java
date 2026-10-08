@@ -20,6 +20,7 @@ public class Appointment {
     private String vehiclePlate;
     private String vehicleModel;
     private String remark;
+    private LocalDateTime checkedInAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

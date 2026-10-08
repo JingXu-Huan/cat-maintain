@@ -109,7 +109,14 @@ public class ProductService {
     @Transactional
     public void decreaseStockForOrder(Long id, int quantity) {
         if (quantity < 1 || productMapper.adjustStock(id, -quantity) == 0) {
-            throw new BusinessException(HttpStatus.CONFLICT, "INSUFFICIENT_STOCK", "库存不足，订单未创建");
+            throw new BusinessException(HttpStatus.CONFLICT, "INSUFFICIENT_STOCK", "库存不足，配送未完成");
+        }
+    }
+
+    @Transactional
+    public void restoreStockForOrder(Long id, int quantity) {
+        if (quantity < 1 || productMapper.adjustStock(id, quantity) == 0) {
+            throw new BusinessException(HttpStatus.CONFLICT, "STOCK_RESTORE_FAILED", "库存恢复失败，订单未拒绝");
         }
     }
 

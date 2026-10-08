@@ -10,11 +10,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     credentials: 'include',
     headers,
-  })
+  }).catch(() => { throw new Error('暂时无法连接服务，请检查网络后重试。') })
 
   if (!response.ok) {
     const errorBody = (await response.json().catch(() => null)) as { message?: string } | null
-    throw new Error(errorBody?.message ?? `接口请求失败（HTTP ${response.status}）`)
+    throw new Error(errorBody?.message ?? (response.status >= 500 ? '服务暂时不可用，请稍后重试。' : '请求未能完成，请刷新页面后重试。'))
   }
 
   if (response.status === 204) {

@@ -1,12 +1,12 @@
 import { getJson, postJson, putJson } from './http'
 import type { MaintenancePage, MaintenanceRecord } from '../types/maintenance'
 
-export function listMyMaintenanceRecords() {
-  return getJson<MaintenancePage>('/api/maintenance-records?page=0&size=50')
+export function listMyMaintenanceRecords(page = 0, size = 20) {
+  return getJson<MaintenancePage>(`/api/maintenance-records?page=${page}&size=${size}`)
 }
 
-export function listStoreMaintenanceRecords() {
-  return getJson<MaintenancePage>('/api/store/maintenance-records?page=0&size=50')
+export function listStoreMaintenanceRecords(page = 0, size = 20) {
+  return getJson<MaintenancePage>(`/api/store/maintenance-records?page=${page}&size=${size}`)
 }
 
 export function startMaintenance(appointmentId: number, content: string) {

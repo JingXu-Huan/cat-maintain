@@ -16,15 +16,28 @@ public interface AppointmentMapper {
 
     @Select("""
             SELECT id, account_id, store_id, order_id, appointment_time, status,
-                   vehicle_plate, vehicle_model, remark, created_at, updated_at
+                   vehicle_plate, vehicle_model, remark, checked_in_at, created_at, updated_at
             FROM appointments WHERE id = #{id}
             """)
     Appointment findById(@Param("id") Long id);
 
+    @Select("SELECT * FROM appointments WHERE id = #{id} FOR UPDATE")
+    Appointment findByIdForUpdate(@Param("id") Long id);
+
+    @Select("SELECT * FROM appointments WHERE order_id = #{orderId} ORDER BY appointment_time DESC, id DESC")
+    List<Appointment> findByOrderId(@Param("orderId") Long orderId);
+
+    @Update("""
+            UPDATE appointments SET checked_in_at = CURRENT_TIMESTAMP
+            WHERE id = #{id} AND account_id = #{accountId} AND store_id = #{storeId}
+              AND status = 'CONFIRMED' AND checked_in_at IS NULL
+            """)
+    int checkIn(@Param("id") Long id, @Param("accountId") Long accountId, @Param("storeId") Long storeId);
+
     @Select("""
             <script>
             SELECT id, account_id, store_id, order_id, appointment_time, status,
-                   vehicle_plate, vehicle_model, remark, created_at, updated_at
+                   vehicle_plate, vehicle_model, remark, checked_in_at, created_at, updated_at
             FROM appointments
             <where>
                 <if test="accountId != null">account_id = #{accountId}</if>
@@ -59,6 +72,7 @@ public interface AppointmentMapper {
     @Update("""
             UPDATE appointments SET status = 'CANCELLED'
             WHERE id = #{id} AND account_id = #{accountId} AND status IN ('PENDING', 'CONFIRMED')
+              AND checked_in_at IS NULL
             """)
     int cancel(@Param("id") Long id, @Param("accountId") Long accountId);
 

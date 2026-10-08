@@ -69,6 +69,9 @@ public class OrderService {
         for (Map.Entry<Long, Integer> entry : quantities.entrySet()) {
             Product product = productMap.get(entry.getKey());
             int quantity = entry.getValue();
+            if (product.getStock() < quantity) {
+                throw new BusinessException(HttpStatus.CONFLICT, "INSUFFICIENT_STOCK", "商品库存不足，订单未创建");
+            }
             BigDecimal productLine = product.getPrice().multiply(BigDecimal.valueOf(quantity));
             BigDecimal laborLine = product.getLaborFee().multiply(BigDecimal.valueOf(quantity));
             productAmount = productAmount.add(productLine);
@@ -95,7 +98,6 @@ public class OrderService {
         orderMapper.insert(order);
 
         for (OrderItem item : items) {
-            productService.decreaseStockForOrder(item.getProductId(), item.getQuantity());
             item.setOrderId(order.getId());
         }
         orderMapper.insertItems(items);
@@ -141,12 +143,17 @@ public class OrderService {
     @Transactional
     public OrderResponse reject(Long id, OrderDecisionRequest request, HttpSession session) {
         sessionAccountService.requireRole(session, AccountRole.ADMIN);
-        Order order = requireOrder(id);
+        Order order = requireOrderForUpdate(id);
         ensureStatus(order, OrderStatus.PENDING_APPROVAL);
         String reason = request == null || request.reason() == null || request.reason().isBlank()
                 ? "订单未通过平台审核" : request.reason().trim();
         if (orderMapper.reject(id, reason) == 0) {
             throw invalidState();
+        }
+        if (order.isStockDeducted()) {
+            orderMapper.findItemsByOrderIds(List.of(id)).stream()
+                    .sorted(java.util.Comparator.comparing(OrderItem::getProductId))
+                    .forEach(item -> productService.restoreStockForOrder(item.getProductId(), item.getQuantity()));
         }
         return response(requireOrder(id));
     }
@@ -154,8 +161,14 @@ public class OrderService {
     @Transactional
     public OrderResponse deliver(Long id, HttpSession session) {
         sessionAccountService.requireRole(session, AccountRole.ADMIN);
-        Order order = requireOrder(id);
+        Order order = requireOrderForUpdate(id);
         ensureStatus(order, OrderStatus.APPROVED);
+        // 按商品 ID 加锁，降低多商品订单并发配送时的死锁风险。
+        List<OrderItem> items = orderMapper.findItemsByOrderIds(List.of(id));
+        if (!order.isStockDeducted()) {
+            items.stream().sorted(java.util.Comparator.comparing(OrderItem::getProductId))
+                    .forEach(item -> productService.decreaseStockForOrder(item.getProductId(), item.getQuantity()));
+        }
         for (int attempt = 0; attempt < 5; attempt++) {
             String code = generateVerificationCode();
             try {
@@ -183,25 +196,46 @@ public class OrderService {
     public OrderResponse verify(Long id, VerifyOrderRequest request, HttpSession session) {
         Account account = sessionAccountService.requireRole(session, AccountRole.STORE);
         MerchantStore store = requireStore(account.getId());
-        Order order = requireOrder(id);
+        Order order = requireOrderForUpdate(id);
         if (!order.getStoreId().equals(store.getId())) {
             throw forbiddenOrder();
         }
-        if (!request.verificationCode().equals(order.getVerificationCode())) {
+        return verifyOrder(order, store.getId(), request.verificationCode());
+    }
+
+    @Transactional
+    public OrderResponse verifyForCheckIn(Long id, Long accountId, Long storeId, String code) {
+        Order order = requireOrderForUpdate(id);
+        if (!order.getAccountId().equals(accountId) || !order.getStoreId().equals(storeId)) {
+            throw forbiddenOrder();
+        }
+        return verifyOrder(order, storeId, code);
+    }
+
+    private OrderResponse verifyOrder(Order order, Long storeId, String code) {
+        if (!code.equals(order.getVerificationCode())) {
             throw new BusinessException(HttpStatus.CONFLICT, "INVALID_VERIFICATION_CODE", "核销码不正确");
         }
         if (order.getStatus() == OrderStatus.VERIFIED || order.getStatus() == OrderStatus.COMPLETED) {
             return response(order);
         }
         ensureStatus(order, OrderStatus.DELIVERED);
-        if (orderMapper.verify(id, store.getId(), request.verificationCode()) == 0) {
-            Order latest = requireOrder(id);
+        if (orderMapper.verify(order.getId(), storeId, code) == 0) {
+            Order latest = requireOrder(order.getId());
             if (latest.getStatus() == OrderStatus.VERIFIED || latest.getStatus() == OrderStatus.COMPLETED) {
                 return response(latest);
             }
             throw invalidState();
         }
-        return response(requireOrder(id));
+        return response(requireOrder(order.getId()));
+    }
+
+    public Order requireOrderForUpdate(Long id) {
+        Order order = orderMapper.findByIdForUpdate(id);
+        if (order == null) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, "ORDER_NOT_FOUND", "订单不存在");
+        }
+        return order;
     }
 
     @Transactional

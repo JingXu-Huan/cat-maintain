@@ -91,6 +91,83 @@ class MaintenanceAndReviewControllerMySqlIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.content[0].orderId").value(orderId));
         mockMvc.perform(get("/api/maintenance-records").session(userSession))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.content[0].id").value(recordId));
+
+        String productReview = "{\"orderId\":" + orderId + ",\"productId\":" + productId + ",\"rating\":5,\"content\":\"配件质量很好\"}";
+        mockMvc.perform(post("/api/product-reviews").session(userSession).contentType(MediaType.APPLICATION_JSON).content(productReview))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.productId").value(productId));
+        mockMvc.perform(post("/api/product-reviews").session(userSession).contentType(MediaType.APPLICATION_JSON).content(productReview))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PRODUCT_REVIEW_ALREADY_EXISTS"));
+        mockMvc.perform(get("/api/products/{id}/reviews", productId))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content[0].rating").value(5));
+        mockMvc.perform(get("/api/product-reviews").session(userSession))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].productId").value(productId));
+        long unpurchasedId = createProduct(adminSession, "UNPURCHASED-" + suffix);
+        mockMvc.perform(post("/api/product-reviews").session(userSession).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"orderId\":" + orderId + ",\"productId\":" + unpurchasedId + ",\"rating\":5}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("PRODUCT_NOT_PURCHASED"));
+        MockHttpSession otherSession = login(registerUser("review_other_" + suffix), "Password123");
+        mockMvc.perform(post("/api/product-reviews").session(otherSession).contentType(MediaType.APPLICATION_JSON).content(productReview))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("REVIEW_ACCESS_DENIED"));
+    }
+
+    @Test
+    @Transactional
+    void userCheckInValidatesOwnershipAndCodeAndIsIdempotent() throws Exception {
+        String suffix = uniqueSuffix();
+        String storeUsername = registerStore("checkin_store_" + suffix);
+        long storeId = findPendingStore(storeUsername).getId();
+        MockHttpSession adminSession = login("admin", "Admin123!");
+        approveStore(adminSession, storeId);
+        MockHttpSession storeSession = login(storeUsername, "Password123");
+        MockHttpSession userSession = login(registerUser("checkin_user_" + suffix), "Password123");
+        MockHttpSession otherSession = login(registerUser("checkin_other_" + suffix), "Password123");
+        long productId = createProduct(adminSession, "CHECKIN-" + suffix);
+        long orderId = createOrder(userSession, storeId, productId);
+        mockMvc.perform(put("/api/admin/orders/{id}/approve", orderId).session(adminSession)).andExpect(status().isOk());
+        MvcResult delivered = mockMvc.perform(put("/api/admin/orders/{id}/deliver", orderId).session(adminSession))
+                .andExpect(status().isOk()).andReturn();
+        String code = extractString(delivered, "verificationCode");
+        String appointmentBody = """
+                {"storeId":%d,"orderId":%d,"appointmentTime":"%s","vehiclePlate":"粤B12345"}
+                """.formatted(storeId, orderId, LocalDateTime.now().plusDays(1).withNano(0));
+        MvcResult created = mockMvc.perform(post("/api/appointments").session(userSession)
+                        .contentType(MediaType.APPLICATION_JSON).content(appointmentBody))
+                .andExpect(status().isCreated()).andReturn();
+        long appointmentId = extractLong(created, "id");
+        String checkInBody = "{\"appointmentId\":" + appointmentId + ",\"verificationCode\":\"" + code + "\"}";
+
+        mockMvc.perform(post("/api/stores/{id}/check-ins", storeId).session(userSession)
+                        .contentType(MediaType.APPLICATION_JSON).content(checkInBody))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("APPOINTMENT_NOT_CONFIRMED"));
+        mockMvc.perform(put("/api/store/appointments/{id}/confirm", appointmentId).session(storeSession))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/appointments").session(userSession).contentType(MediaType.APPLICATION_JSON).content(appointmentBody))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ORDER_ALREADY_APPOINTED"));
+        mockMvc.perform(post("/api/stores/{id}/check-ins", storeId).session(otherSession)
+                        .contentType(MediaType.APPLICATION_JSON).content(checkInBody))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("CHECK_IN_ACCESS_DENIED"));
+        String wrongCode = code.equals("00000000") ? "11111111" : "00000000";
+        mockMvc.perform(post("/api/stores/{id}/check-ins", storeId).session(userSession)
+                        .contentType(MediaType.APPLICATION_JSON).content(checkInBody.replace(code, wrongCode)))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("INVALID_VERIFICATION_CODE"));
+        mockMvc.perform(get("/api/orders/{id}", orderId).session(userSession))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("DELIVERED"));
+        mockMvc.perform(get("/api/appointments").session(userSession))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content[0].checkedInAt").doesNotExist());
+        for (int attempt = 0; attempt < 2; attempt++) {
+            mockMvc.perform(post("/api/stores/{id}/check-ins", storeId).session(userSession)
+                            .contentType(MediaType.APPLICATION_JSON).content(checkInBody))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.appointment.checkedInAt").isNotEmpty())
+                    .andExpect(jsonPath("$.order.status").value("VERIFIED"));
+        }
+        mockMvc.perform(get("/api/store/orders/lookup-appointments").param("code", code).session(storeSession))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(appointmentId))
+                .andExpect(jsonPath("$[0].checkedInAt").isNotEmpty());
+        mockMvc.perform(put("/api/appointments/{id}/cancel", appointmentId).session(userSession))
+                .andExpect(status().isConflict());
+        mockMvc.perform(get("/api/store/profile").session(userSession)).andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/store/profile").session(storeSession))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(storeId));
     }
 
     @Test

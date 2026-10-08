@@ -10,6 +10,7 @@ export interface Appointment {
   vehiclePlate: string
   vehicleModel: string | null
   remark: string | null
+  checkedInAt: string | null
   createdAt: string
 }
 

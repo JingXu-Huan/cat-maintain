@@ -14,6 +14,7 @@ public record AppointmentResponse(
         String vehiclePlate,
         String vehicleModel,
         String remark,
+        LocalDateTime checkedInAt,
         LocalDateTime createdAt
 ) {
 
@@ -21,7 +22,7 @@ public record AppointmentResponse(
         return new AppointmentResponse(
                 appointment.getId(), appointment.getAccountId(), appointment.getStoreId(), appointment.getOrderId(),
                 appointment.getAppointmentTime(), appointment.getStatus().name(), appointment.getVehiclePlate(),
-                appointment.getVehicleModel(), appointment.getRemark(), appointment.getCreatedAt()
+                appointment.getVehicleModel(), appointment.getRemark(), appointment.getCheckedInAt(), appointment.getCreatedAt()
         );
     }
 }

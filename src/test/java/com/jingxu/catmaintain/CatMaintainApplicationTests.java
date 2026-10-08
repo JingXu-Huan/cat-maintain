@@ -34,7 +34,7 @@ class CatMaintainApplicationTests {
                 WHERE table_schema = DATABASE()
                   AND table_name IN (
                       'accounts', 'merchant_stores', 'products', 'orders',
-                      'order_items', 'appointments', 'maintenance_records', 'reviews'
+                      'order_items', 'appointments', 'maintenance_records', 'reviews', 'product_reviews'
                   )
                 """, String.class);
 
@@ -46,7 +46,8 @@ class CatMaintainApplicationTests {
                 "order_items",
                 "appointments",
                 "maintenance_records",
-                "reviews"
+                "reviews",
+                "product_reviews"
         );
     }
 

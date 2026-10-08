@@ -5,16 +5,16 @@ export function createAppointment(input: { storeId: number; orderId?: number; ap
   return postJson<Appointment>('/api/appointments', input)
 }
 
-export function listMyAppointments() {
-  return getJson<AppointmentPage>('/api/appointments?page=0&size=50')
+export function listMyAppointments(page = 0, size = 20) {
+  return getJson<AppointmentPage>(`/api/appointments?page=${page}&size=${size}`)
 }
 
 export function cancelAppointment(id: number) {
   return putJson<Appointment>(`/api/appointments/${id}/cancel`)
 }
 
-export function listStoreAppointments() {
-  return getJson<AppointmentPage>('/api/store/appointments?page=0&size=50')
+export function listStoreAppointments(page = 0, size = 20) {
+  return getJson<AppointmentPage>(`/api/store/appointments?page=${page}&size=${size}`)
 }
 
 export function confirmAppointment(id: number) {
