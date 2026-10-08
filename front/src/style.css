@@ -133,6 +133,11 @@ label { min-width: 0; }
 .auth-tabs button.active, .role-tabs button.active { background: white; color: var(--blue-ink); font-weight: 650; }
 .role-tabs { margin-top: 14px; }
 .auth-form { display: grid; gap: 18px; margin-top: 24px; }
+.auth-field { display: grid; align-content: start; gap: 8px; }
+.auth-field input { font-size: 16px; }
+.auth-field input[aria-invalid="true"] { border-color: var(--danger); }
+.auth-field-error { margin: 0; color: var(--danger); font-size: 14px; font-weight: 400; line-height: 1.5; }
+.auth-field-error:empty { display: none; }
 .auth-submit { width: 100%; margin-top: 4px; }
 .auth-session { display: grid; gap: 18px; }
 .auth-session p { margin: 0; color: var(--muted); }

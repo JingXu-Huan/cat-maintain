@@ -15,6 +15,8 @@ set -a
 source "$base/.env"
 set +a
 [[ ${ADMIN_PASSWORD_HASH:-} =~ ^\$2[aby]\$[0-9]{2}\$[./A-Za-z0-9]{53}$ ]]
+backup_database=${DEPLOY_BACKUP_DATABASE:-true}
+[[ "$backup_database" == true || "$backup_database" == false ]]
 export APP_VERSION=${release##*/}
 previous=''
 if [[ -L "$base/current" ]]; then
@@ -40,7 +42,7 @@ recover() {
     elif [[ "$services_stopped" == true ]]; then
         compose stop web backend || true
     fi
-    echo 'Deployment failed. Database backup is retained; schema is not automatically reverted.' >&2
+    echo 'Deployment failed. Schema is not automatically reverted.' >&2
     exit "$result"
 }
 trap recover ERR
@@ -48,10 +50,14 @@ trap recover ERR
 # Build runtime images before interrupting the currently running application.
 compose build --pull backend web
 compose up -d --wait --wait-timeout 180 mysql
-mkdir -p -- "$base/backups"
-compose exec -T mysql sh -c \
-    'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysqldump -uroot --single-transaction --no-tablespaces "$MYSQL_DATABASE"' \
-    | gzip > "$base/backups/$APP_VERSION.sql.gz"
+if [[ "$backup_database" == true ]]; then
+    mkdir -p -- "$base/backups"
+    compose exec -T mysql sh -c \
+        'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysqldump -uroot --single-transaction --no-tablespaces "$MYSQL_DATABASE"' \
+        | gzip > "$base/backups/$APP_VERSION.sql.gz"
+else
+    echo 'Database backup skipped (DEPLOY_BACKUP_DATABASE=false).'
+fi
 
 services_stopped=true
 compose stop web backend
